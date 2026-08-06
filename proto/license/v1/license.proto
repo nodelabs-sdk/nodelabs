@@ -1,0 +1,46 @@
+syntax = "proto3";
+package license.v1;
+
+import "cosmos_proto/cosmos.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/license/types";
+
+// Params defines the parameters for the license module.
+message Params {
+  // owner is the address allowed to grant and revoke access within this
+  // module. It is empty until governance sets it, and while empty no grant can
+  // be made — the module fails closed.
+  //
+  // Owning the module confers the right to delegate actions, not the actions
+  // themselves: the owner must grant itself "type.create" like anyone else.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// LicenseStatus enumerates the lifecycle states of a license.
+enum LicenseStatus {
+  // LICENSE_STATUS_UNSPECIFIED is the zero value and never valid in state.
+  LICENSE_STATUS_UNSPECIFIED = 0;
+  // LICENSE_STATUS_ACTIVE marks a license that is currently valid.
+  LICENSE_STATUS_ACTIVE = 1;
+  // LICENSE_STATUS_REVOKED marks a license that has been revoked.
+  LICENSE_STATUS_REVOKED = 2;
+}
+
+// License represents an issued license instance.
+message License {
+  // id is the auto-incremented identifier, unique chain-wide across all
+  // license types. A bare id is a complete handle to a license.
+  uint64 id = 1;
+  // type is the LicenseType.id this license was issued from.
+  string type = 2;
+  // holder is the address that owns this license.
+  string holder = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // start_date is the date from which the license is valid.
+  string start_date = 4;
+  // end_date is the date the license stops being valid. As issued it is the
+  // expiry date, with the empty string meaning no expiry; revocation
+  // overwrites it with the revocation date (block date).
+  string end_date = 5;
+  // status is the license lifecycle state.
+  LicenseStatus status = 6;
+}

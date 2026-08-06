@@ -1,0 +1,22 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/nodelabs-sdk/nodelabs/api
+    except:
+      - buf.build/googleapis/googleapis
+      - buf.build/cosmos/gogo-proto
+      - buf.build/cosmos/cosmos-proto
+    override:
+      buf.build/cosmos/cosmos-sdk: cosmossdk.io/api
+plugins:
+  # Staged into .protogen rather than the repo root: with
+  # paths=source_relative the license namespace would be written to ./license,
+  # which collides with the repo's LICENSE file on case-insensitive
+  # filesystems. scripts/protocgen.sh moves .protogen into api/.
+  - name: go-pulsar
+    out: ../.protogen
+    opt: paths=source_relative
+  - name: go-grpc
+    out: ../.protogen
+    opt: paths=source_relative

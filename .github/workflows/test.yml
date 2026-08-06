@@ -1,0 +1,56 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Callable from other workflows so the release build can gate on the same
+  # checks without duplicating them.
+  workflow_call:
+
+# A newer push to a PR supersedes an in-flight run. Never cancel on main or
+# during a release build, where the result is the gate rather than feedback.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.8'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build
+      run: go build ./...
+
+    - name: Check formatting
+      run: |
+        # Scoped to hand-written packages; api/ is generated and formatted by
+        # the protoc plugins.
+        unformatted=$(gofmt -l app cmd x testutil)
+        if [ -n "$unformatted" ]; then
+          echo "::error::These files need gofmt:"
+          echo "$unformatted"
+          exit 1
+        fi
+
+    - name: Vet
+      # Scoped rather than ./... so a future proto regeneration emitting
+      # vet-unclean generated code cannot break CI on a non-issue.
+      run: go vet ./app/... ./cmd/... ./x/... ./testutil/...
+
+    - name: Test
+      # make test == go test -race ./..., so CI and local runs stay identical.
+      run: make test

@@ -1,0 +1,83 @@
+package ante
+
+import (
+	errorsmod "cosmossdk.io/errors"
+	storetypes "cosmossdk.io/store/types"
+	txsigning "cosmossdk.io/x/tx/signing"
+
+	"github.com/cosmos/cosmos-sdk/codec"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"github.com/cosmos/cosmos-sdk/x/auth/ante"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+
+	evmante "github.com/cosmos/evm/ante"
+	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
+
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+
+	networkante "github.com/nodelabs-sdk/nodelabs/x/network/ante"
+	networkkeeper "github.com/nodelabs-sdk/nodelabs/x/network/keeper"
+)
+
+// HandlerOptions defines the list of module keepers required to run the
+// nodelabs AnteHandler decorators: the stock Cosmos EVM set plus the
+// x/network gasless machinery.
+type HandlerOptions struct {
+	Cdc                    codec.BinaryCodec
+	AccountKeeper          authkeeper.AccountKeeper
+	BankKeeper             bankkeeper.Keeper
+	IBCKeeper              *ibckeeper.Keeper
+	FeeMarketKeeper        anteinterfaces.FeeMarketKeeper
+	EvmKeeper              anteinterfaces.EVMKeeper
+	FeegrantKeeper         ante.FeegrantKeeper
+	ExtensionOptionChecker ante.ExtensionOptionChecker
+	SignModeHandler        *txsigning.HandlerMap
+	SigGasConsumer         func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
+	MaxTxGasWanted         uint64
+	// use dynamic fee checker or the cosmos-sdk default one for native transactions
+	DynamicFeeChecker bool
+	PendingTxListener evmante.PendingTxListener
+
+	// NetworkKeeper serves the gasless caps params and this module's
+	// admission checks.
+	NetworkKeeper networkkeeper.Keeper
+	// GaslessAllowlist is the set of msg type URLs admitted with zero fees.
+	GaslessAllowlist map[string]bool
+	// AdmissionRouter routes every allowlisted URL to the keeper that vets
+	// it; admission fails closed on unrouted msgs.
+	AdmissionRouter networkante.AdmissionRouter
+}
+
+// Validate checks if the keepers are defined
+func (options HandlerOptions) Validate() error {
+	if options.Cdc == nil {
+		return errorsmod.Wrap(errortypes.ErrLogic, "codec is required for AnteHandler")
+	}
+	if options.BankKeeper == nil {
+		return errorsmod.Wrap(errortypes.ErrLogic, "bank keeper is required for AnteHandler")
+	}
+	if options.SigGasConsumer == nil {
+		return errorsmod.Wrap(errortypes.ErrLogic, "signature gas consumer is required for AnteHandler")
+	}
+	if options.SignModeHandler == nil {
+		return errorsmod.Wrap(errortypes.ErrLogic, "sign mode handler is required for AnteHandler")
+	}
+	if options.FeeMarketKeeper == nil {
+		return errorsmod.Wrap(errortypes.ErrLogic, "fee market keeper is required for AnteHandler")
+	}
+	if options.EvmKeeper == nil {
+		return errorsmod.Wrap(errortypes.ErrLogic, "evm keeper is required for AnteHandler")
+	}
+	if len(options.GaslessAllowlist) == 0 {
+		return errorsmod.Wrap(errortypes.ErrLogic, "gasless allowlist is required for AnteHandler")
+	}
+	for url := range options.GaslessAllowlist {
+		if _, ok := options.AdmissionRouter[url]; !ok {
+			return errorsmod.Wrapf(errortypes.ErrLogic, "allowlisted gasless msg %s has no admission route", url)
+		}
+	}
+	return nil
+}

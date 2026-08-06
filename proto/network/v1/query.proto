@@ -1,0 +1,290 @@
+syntax = "proto3";
+package network.v1;
+
+import "access/v1/access.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "network/v1/network.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/network/types";
+
+// Query defines the gRPC querier service.
+service Query {
+  // Params queries the module parameters, including the module owner.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/nodelabs/network/params";
+  }
+
+  // Actions queries the action vocabulary this module recognises. It is
+  // compiled into the binary rather than stored, so the answer is the same for
+  // every node running this version.
+  rpc Actions(QueryActionsRequest) returns (QueryActionsResponse) {
+    option (google.api.http).get = "/nodelabs/network/actions";
+  }
+
+  // Grants queries every access grant in the module.
+  rpc Grants(QueryGrantsRequest) returns (QueryGrantsResponse) {
+    option (google.api.http).get = "/nodelabs/network/grants";
+  }
+
+  // GrantsByGrantee queries the grants held by an address.
+  rpc GrantsByGrantee(QueryGrantsByGranteeRequest) returns (QueryGrantsByGranteeResponse) {
+    option (google.api.http).get = "/nodelabs/network/grants/{grantee}";
+  }
+
+  // Can reports whether a grantee holds an action grant. There is no
+  // by-scope query: this module does not scope its actions.
+  rpc Can(QueryCanRequest) returns (QueryCanResponse) {
+    option (google.api.http).get = "/nodelabs/network/can/{grantee}/{action}";
+  }
+
+  // Node queries a node by address.
+  rpc Node(QueryNodeRequest) returns (QueryNodeResponse) {
+    option (google.api.http).get = "/nodelabs/network/node/{address}";
+  }
+
+  // Nodes queries all nodes.
+  rpc Nodes(QueryNodesRequest) returns (QueryNodesResponse) {
+    option (google.api.http).get = "/nodelabs/network/nodes";
+  }
+
+  // NodesByOperator queries all nodes activated under an operator.
+  rpc NodesByOperator(QueryNodesByOperatorRequest) returns (QueryNodesByOperatorResponse) {
+    option (google.api.http).get = "/nodelabs/network/nodes_by_operator/{operator}";
+  }
+
+  // NodeType queries a registered node type by id.
+  rpc NodeType(QueryNodeTypeRequest) returns (QueryNodeTypeResponse) {
+    option (google.api.http).get = "/nodelabs/network/node_type/{id}";
+  }
+
+  // NodeTypes queries registered node types, optionally only those bound to
+  // one license type.
+  rpc NodeTypes(QueryNodeTypesRequest) returns (QueryNodeTypesResponse) {
+    option (google.api.http).get = "/nodelabs/network/node_types";
+  }
+
+  // ActivationKey queries an activation key by address.
+  rpc ActivationKey(QueryActivationKeyRequest) returns (QueryActivationKeyResponse) {
+    option (google.api.http).get = "/nodelabs/network/activation_key/{address}";
+  }
+
+  // ActivationKeys queries the activation keys authorized by an operator.
+  rpc ActivationKeys(QueryActivationKeysRequest) returns (QueryActivationKeysResponse) {
+    option (google.api.http).get = "/nodelabs/network/activation_keys/{operator}";
+  }
+
+  // NodeCounts queries an operator's node tallies and current limits, so a
+  // hosting provider can pre-check whether an activation would be admitted.
+  rpc NodeCounts(QueryNodeCountsRequest) returns (QueryNodeCountsResponse) {
+    option (google.api.http).get = "/nodelabs/network/node_counts/{operator}";
+  }
+}
+
+// QueryParamsRequest is the request type for the Query/Params RPC method.
+message QueryParamsRequest {}
+
+// QueryParamsResponse is the response type for the Query/Params RPC method.
+message QueryParamsResponse {
+  // params are the current module parameters.
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryActionsRequest is the request type for the Query/Actions RPC method.
+message QueryActionsRequest {}
+
+// QueryActionsResponse is the response type for the Query/Actions RPC method.
+// The vocabulary is compiled in rather than stored, so this query is not
+// paginated. There is no unscoped list: this module does not scope its
+// actions, so every action is module-wide.
+message QueryActionsResponse {
+  // actions is the full vocabulary, in ascending order.
+  repeated string actions = 1;
+}
+
+// QueryGrantsRequest is the request type for the Query/Grants RPC method.
+message QueryGrantsRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryGrantsResponse is the response type for the Query/Grants RPC method.
+message QueryGrantsResponse {
+  repeated access.v1.Grant grants = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryGrantsByGranteeRequest is the request type for the Query/GrantsByGrantee RPC method.
+message QueryGrantsByGranteeRequest {
+  string grantee = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryGrantsByGranteeResponse is the response type for the Query/GrantsByGrantee RPC method.
+message QueryGrantsByGranteeResponse {
+  repeated access.v1.Grant grants = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryCanRequest is the request type for the Query/Can RPC method.
+message QueryCanRequest {
+  string grantee = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string action = 2;
+}
+
+// QueryCanResponse is the response type for the Query/Can RPC method.
+message QueryCanResponse {
+  bool can = 1;
+}
+
+// QueryNodeRequest is the request type for the Query/Node RPC method.
+message QueryNodeRequest {
+  // address is the node account address.
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// QueryNodeResponse is the response type for the Query/Node RPC method.
+message QueryNodeResponse {
+  // node is the node record.
+  Node node = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryNodesRequest is the request type for the Query/Nodes RPC method.
+message QueryNodesRequest {
+  // pagination is an optional page request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+  // status optionally filters by node lifecycle status. Leave it unset
+  // (NODE_STATUS_UNSPECIFIED, never a valid stored status) to return nodes of
+  // every status, which is what this query has always done. Node records are
+  // retained after deactivation, so an unfiltered listing includes every node
+  // ever activated.
+  NodeStatus status = 2;
+}
+
+// QueryNodesResponse is the response type for the Query/Nodes RPC method.
+message QueryNodesResponse {
+  // nodes are the node records in address order.
+  repeated Node nodes = 1 [(gogoproto.nullable) = false];
+  // pagination is the page response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryNodesByOperatorRequest is the request type for the Query/NodesByOperator RPC method.
+message QueryNodesByOperatorRequest {
+  // operator is the operator wallet address.
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // pagination is an optional page request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+  // status optionally filters by node lifecycle status; unset returns nodes
+  // of every status. See QueryNodesRequest.status.
+  NodeStatus status = 3;
+}
+
+// QueryNodesByOperatorResponse is the response type for the Query/NodesByOperator RPC method.
+message QueryNodesByOperatorResponse {
+  // nodes are the operator's node records in address order.
+  repeated Node nodes = 1 [(gogoproto.nullable) = false];
+  // pagination is the page response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryNodeTypeRequest is the request type for the Query/NodeType RPC method.
+message QueryNodeTypeRequest {
+  // id is the node type identifier.
+  string id = 1;
+}
+
+// QueryNodeTypeResponse is the response type for the Query/NodeType RPC method.
+message QueryNodeTypeResponse {
+  // node_type is the registered node type.
+  NodeType node_type = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryNodeTypesRequest is the request type for the Query/NodeTypes RPC method.
+message QueryNodeTypesRequest {
+  // pagination is an optional page request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+  // license_type_id optionally restricts the result to the node types bound to
+  // one license type. Leave it empty to return every registered node type. A
+  // node type always names a license type, so the empty string cannot collide
+  // with a real binding.
+  string license_type_id = 2;
+}
+
+// QueryNodeTypesResponse is the response type for the Query/NodeTypes RPC method.
+message QueryNodeTypesResponse {
+  // node_types are the registered node types in id order.
+  repeated NodeType node_types = 1 [(gogoproto.nullable) = false];
+  // pagination is the page response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryActivationKeyRequest is the request type for the Query/ActivationKey RPC method.
+message QueryActivationKeyRequest {
+  // address is the activation key address.
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// QueryActivationKeyResponse is the response type for the Query/ActivationKey RPC method.
+message QueryActivationKeyResponse {
+  // activation_key is the activation key record.
+  ActivationKey activation_key = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryActivationKeysRequest is the request type for the Query/ActivationKeys RPC method.
+message QueryActivationKeysRequest {
+  // operator is the operator wallet address.
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // pagination is an optional page request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryActivationKeysResponse is the response type for the Query/ActivationKeys RPC method.
+message QueryActivationKeysResponse {
+  // activation_keys are the operator's key records, active and disabled.
+  repeated ActivationKey activation_keys = 1 [(gogoproto.nullable) = false];
+  // pagination is the page response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryNodeCountsRequest is the request type for the Query/NodeCounts RPC method.
+message QueryNodeCountsRequest {
+  // operator is the operator wallet address.
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // node_type optionally restricts the result to one node type. Leave it empty
+  // to get one entry per registered node type.
+  string node_type = 2;
+}
+
+// NodeTypeCounts is an operator's tallies and limits for a single node type.
+// Limits are computed from the operator's active licenses of the license type
+// bound to this node type, so they change when those licenses are issued or
+// revoked — and licenses of any other type do not affect them.
+message NodeTypeCounts {
+  // node_type is the node type these numbers describe.
+  string node_type = 1;
+  // license_type_id is the license type backing node_type.
+  string license_type_id = 2;
+  // total is the number of nodes of this type ever activated by the operator.
+  uint64 total = 3;
+  // active is the number of the operator's currently active nodes of this type.
+  uint64 active = 4;
+  // recent_active is the number of this type's nodes with counted activity
+  // today or yesterday (UTC).
+  uint64 recent_active = 5;
+  // license_count is the operator's active licenses of license_type_id.
+  uint64 license_count = 6;
+  // activation_limit is activation_limit_multiplier x license_count.
+  uint64 activation_limit = 7;
+  // spam_limit is spam_limit_multiplier x license_count.
+  uint64 spam_limit = 8;
+}
+
+// QueryNodeCountsResponse is the response type for the Query/NodeCounts RPC
+// method. Entitlement is per node type, so the answer is a breakdown rather
+// than a single tally.
+message QueryNodeCountsResponse {
+  // counts holds one entry per node type, in node type id order.
+  repeated NodeTypeCounts counts = 1 [(gogoproto.nullable) = false];
+}

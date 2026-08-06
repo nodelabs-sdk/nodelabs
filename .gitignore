@@ -1,0 +1,44 @@
+# Binaries
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+nodelabsd
+
+# Go
+vendor/
+go.work
+go.work.sum
+
+# Test
+*.test
+*.out
+coverage.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Chain data
+.nodelabsd/
+
+# Testnet
+.testnets/
+
+# Proto generated temp files
+docs/static/tmp/
+# Pulsar staging dir; scripts/protocgen.sh moves it into api/ and only a
+# failed run leaves it behind.
+.protogen/
+
+# Claude
+.claude/

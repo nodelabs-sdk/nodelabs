@@ -1,0 +1,338 @@
+syntax = "proto3";
+package network.v1;
+
+import "access/v1/access.proto";
+import "amino/amino.proto";
+import "cosmos/msg/v1/msg.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "network/v1/network.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/network/types";
+
+// Msg defines the Msg service. AuthorizeActivationKey, ActivateNode,
+// DeactivateNode, and UpdateNodeStatus are gasless: they are admitted with a
+// zero fee subject to the module's ante-handler admission checks and daily
+// quotas.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  // CreateOperatorAccount creates an on-chain account for an operator wallet.
+  // Signer must hold this module's "wallet.create" grant. Fallback for wallets
+  // that predate account creation on license issuance or hold no licenses yet.
+  rpc CreateOperatorAccount(MsgCreateOperatorAccount) returns (MsgCreateOperatorAccountResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/create_operator_account"
+      body: "*"
+    };
+  }
+
+  // CreateNodeType registers a node type bound to a license type. Signer must
+  // hold this module's "nodetype.create" grant, and the named license type
+  // must exist. Regular gas tx.
+  rpc CreateNodeType(MsgCreateNodeType) returns (MsgCreateNodeTypeResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/create_node_type"
+      body: "*"
+    };
+  }
+
+  // AuthorizeActivationKey authorizes a new activation key for the signing
+  // operator wallet. Gasless.
+  rpc AuthorizeActivationKey(MsgAuthorizeActivationKey) returns (MsgAuthorizeActivationKeyResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/authorize_activation_key"
+      body: "*"
+    };
+  }
+
+  // DeauthorizeActivationKey disables an activation key. Regular gas tx; the
+  // handler additionally charges the deauthorize_fee param to the operator.
+  rpc DeauthorizeActivationKey(MsgDeauthorizeActivationKey) returns (MsgDeauthorizeActivationKeyResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/deauthorize_activation_key"
+      body: "*"
+    };
+  }
+
+  // ActivateNode activates a node under an operator, signed by an authorized
+  // activation key. Gasless.
+  rpc ActivateNode(MsgActivateNode) returns (MsgActivateNodeResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/activate_node"
+      body: "*"
+    };
+  }
+
+  // DeactivateNode deactivates a node. Signed by the operator, the node's
+  // original (still-active) activation key, or the node itself. Gasless.
+  rpc DeactivateNode(MsgDeactivateNode) returns (MsgDeactivateNodeResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/deactivate_node"
+      body: "*"
+    };
+  }
+
+  // UpdateNodeStatus records a node's periodic status heartbeat. Gasless,
+  // limited to status_daily_limit per node per UTC day. The payload is
+  // emitted as an event and not stored in state.
+  rpc UpdateNodeStatus(MsgUpdateNodeStatus) returns (MsgUpdateNodeStatusResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/update_node_status"
+      body: "*"
+    };
+  }
+
+  // UpdateParams updates the module parameters, including the module owner.
+  // Signer must be the module authority (governance). It is how an owner is
+  // first established outside genesis, and how a lost or compromised owner key
+  // is recovered without its cooperation.
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/update_params"
+      body: "*"
+    };
+  }
+
+  // TransferOwnership hands the module to a new owner. Signer must be the
+  // current owner. It writes only the owner parameter, leaving every other
+  // parameter untouched.
+  rpc TransferOwnership(MsgTransferOwnership) returns (MsgTransferOwnershipResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/transfer_ownership"
+      body: "*"
+    };
+  }
+
+  // GrantAccess merges access grants for a grantee. Signer must be the module
+  // owner. Existing grants are preserved; new actions are unioned in.
+  rpc GrantAccess(MsgGrantAccess) returns (MsgGrantAccessResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/grant_access"
+      body: "*"
+    };
+  }
+
+  // RevokeAccess removes the given actions from a grantee. Actions that are
+  // not currently granted are silently ignored. Signer must be the module
+  // owner.
+  rpc RevokeAccess(MsgRevokeAccess) returns (MsgRevokeAccessResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/network/tx/revoke_access"
+      body: "*"
+    };
+  }
+}
+
+// MsgCreateOperatorAccount is the Msg/CreateOperatorAccount request type.
+message MsgCreateOperatorAccount {
+  option (cosmos.msg.v1.signer) = "admin";
+  option (amino.name) = "nodelabs/x/network/MsgCreateOperatorAccount";
+
+  // admin is the signer; it must hold the "wallet.create" grant.
+  string admin = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // wallet is the operator wallet address to create an account for.
+  string wallet = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// MsgCreateOperatorAccountResponse is the Msg/CreateOperatorAccount response type.
+message MsgCreateOperatorAccountResponse {}
+
+// MsgCreateNodeType is the Msg/CreateNodeType request type. Registration is
+// gated on the module-wide "nodetype.create" grant, which authorizes defining
+// node types against any existing license type. The signing address is not
+// recorded on the node type: the grant is the whole authorization, so keeping
+// the address would preserve no authority.
+message MsgCreateNodeType {
+  option (cosmos.msg.v1.signer) = "creator";
+  option (amino.name) = "nodelabs/x/network/MsgCreateNodeType";
+
+  // creator is the signer. It must hold the module-wide "nodetype.create"
+  // grant.
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // id is the node type identifier to register. Node type ids are single-use:
+  // records are never removed and cannot be re-registered.
+  string id = 2;
+  // license_type_id is the license type this node type is bound to. The
+  // binding is fixed at creation.
+  string license_type_id = 3;
+}
+
+// MsgCreateNodeTypeResponse is the Msg/CreateNodeType response type.
+message MsgCreateNodeTypeResponse {}
+
+// MsgAuthorizeActivationKey is the Msg/AuthorizeActivationKey request type.
+message MsgAuthorizeActivationKey {
+  option (cosmos.msg.v1.signer) = "operator";
+  option (amino.name) = "nodelabs/x/network/MsgAuthorizeActivationKey";
+
+  // operator is the signing operator wallet.
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // activation_address is the activation key address to authorize. It must
+  // never have been authorized before, by any operator, and is permanently
+  // bound to this operator once authorized.
+  string activation_address = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// MsgAuthorizeActivationKeyResponse is the Msg/AuthorizeActivationKey response type.
+message MsgAuthorizeActivationKeyResponse {}
+
+// MsgDeauthorizeActivationKey is the Msg/DeauthorizeActivationKey request type.
+message MsgDeauthorizeActivationKey {
+  option (cosmos.msg.v1.signer) = "operator";
+  option (amino.name) = "nodelabs/x/network/MsgDeauthorizeActivationKey";
+
+  // operator is the signing operator wallet that owns the key.
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // activation_address is the activation key address to disable.
+  string activation_address = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// MsgDeauthorizeActivationKeyResponse is the Msg/DeauthorizeActivationKey response type.
+message MsgDeauthorizeActivationKeyResponse {}
+
+// MsgActivateNode is the Msg/ActivateNode request type.
+message MsgActivateNode {
+  option (cosmos.msg.v1.signer) = "activation_address";
+  option (amino.name) = "nodelabs/x/network/MsgActivateNode";
+
+  // activation_address is the signing activation key. It must be active and
+  // bound to operator.
+  string activation_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // operator is the wallet whose licenses back this activation.
+  string operator = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // node_address is the node account address to activate. The node does not
+  // sign, so delayed activation works by construction.
+  string node_address = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // node_type is the node type recorded on the node. It must name a
+  // registered NodeType.
+  string node_type = 4;
+}
+
+// MsgActivateNodeResponse is the Msg/ActivateNode response type.
+message MsgActivateNodeResponse {}
+
+// MsgDeactivateNode is the Msg/DeactivateNode request type.
+message MsgDeactivateNode {
+  option (cosmos.msg.v1.signer) = "signer";
+  option (amino.name) = "nodelabs/x/network/MsgDeactivateNode";
+
+  // signer is the operator, the node's original still-active activation key,
+  // or the node itself.
+  string signer = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // node_address is the node to deactivate. Deactivation is irreversible.
+  string node_address = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// MsgDeactivateNodeResponse is the Msg/DeactivateNode response type.
+message MsgDeactivateNodeResponse {}
+
+// NodeStatusPayload carries a node's self-reported status fields. The chain
+// treats every field as opaque: what a node populates is node-software
+// policy, and the payload is emitted as a node_status event rather than
+// stored in state.
+message NodeStatusPayload {
+  // device describes the device/hardware.
+  string device = 1;
+  // os describes the operating system and version.
+  string os = 2;
+  // hostname is the node's self-reported hostname.
+  string hostname = 3;
+  // node_info describes the node software and version.
+  string node_info = 4;
+  // workloads lists the workloads the node is running.
+  repeated string workloads = 5;
+  // memory describes memory capacity/usage.
+  string memory = 6;
+  // cpu describes CPU capacity/usage.
+  string cpu = 7;
+  // storage describes storage capacity/usage.
+  string storage = 8;
+}
+
+// MsgUpdateNodeStatus is the Msg/UpdateNodeStatus request type.
+message MsgUpdateNodeStatus {
+  option (cosmos.msg.v1.signer) = "node_address";
+  option (amino.name) = "nodelabs/x/network/MsgUpdateNodeStatus";
+
+  // node_address is the signing node; it must be active.
+  string node_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // payload is the self-reported status, emitted as an event.
+  NodeStatusPayload payload = 2 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}
+
+// MsgUpdateNodeStatusResponse is the Msg/UpdateNodeStatus response type.
+message MsgUpdateNodeStatusResponse {}
+
+// MsgUpdateParams is the Msg/UpdateParams request type.
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name) = "nodelabs/x/network/MsgUpdateParams";
+
+  // authority is the address that controls the module (defaults to x/gov).
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // params defines the module parameters to update. All parameters must be
+  // supplied.
+  Params params = 2 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}
+
+// MsgUpdateParamsResponse is the Msg/UpdateParams response type.
+message MsgUpdateParamsResponse {}
+
+// MsgTransferOwnership is the Msg/TransferOwnership request type. It is the
+// only message that lets a non-authority signer write a parameter, and it
+// writes just the one: the rest of the parameter set is read back and
+// preserved.
+message MsgTransferOwnership {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/network/MsgTransferOwnership";
+
+  // owner is the signer and must be the current module owner.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // new_owner is the address to hand the module to.
+  string new_owner = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// MsgTransferOwnershipResponse is the Msg/TransferOwnership response type.
+message MsgTransferOwnershipResponse {}
+
+// MsgGrantAccess is the Msg/GrantAccess request type.
+message MsgGrantAccess {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/network/MsgGrantAccess";
+
+  // owner is the signer and must be the current module owner.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // grantee is the address receiving the grants.
+  string grantee = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // grants are the actions to union onto the grantee. This module does not
+  // scope its actions, so every entry must carry an empty scopes list.
+  repeated access.v1.ActionScopes grants = 3 [(gogoproto.nullable) = false];
+}
+
+// MsgGrantAccessResponse is the Msg/GrantAccess response type.
+message MsgGrantAccessResponse {}
+
+// MsgRevokeAccess is the Msg/RevokeAccess request type.
+message MsgRevokeAccess {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/network/MsgRevokeAccess";
+
+  // owner is the signer and must be the current module owner.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // grantee is the address to remove grants from.
+  string grantee = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // actions are the (action, scope) pairs to remove. Pairs that are not
+  // granted are ignored.
+  repeated access.v1.ActionScope actions = 3 [(gogoproto.nullable) = false];
+}
+
+// MsgRevokeAccessResponse is the Msg/RevokeAccess response type.
+message MsgRevokeAccessResponse {}

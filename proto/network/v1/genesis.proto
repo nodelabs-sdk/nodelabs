@@ -1,0 +1,60 @@
+syntax = "proto3";
+package network.v1;
+
+import "access/v1/access.proto";
+import "gogoproto/gogo.proto";
+import "network/v1/network.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/network/types";
+
+// NodeStatusCounter pairs a node address with its daily status-update
+// counter for genesis import/export.
+message NodeStatusCounter {
+  // node_address is the node the counter belongs to.
+  string node_address = 1;
+  // counter is the node's rolling daily status-update counter.
+  ActivityCounter counter = 2 [(gogoproto.nullable) = false];
+}
+
+// GaslessCounter is one gasless-admission daily counter for genesis
+// import/export, keyed by counter kind, signer address, and scope.
+message GaslessCounter {
+  // kind is the admission counter kind ("authorize", "activate",
+  // "deactivate").
+  string kind = 1;
+  // signer is the address the counter is keyed on.
+  string signer = 2;
+  // scope narrows the counter within (kind, signer). It is the node type for
+  // the "activate" kind, whose ceiling is derived from the licenses backing
+  // that node type, and empty for kinds whose limit is a flat param and so
+  // has nothing to be scoped by.
+  string scope = 3;
+  // counter is the rolling daily counter.
+  ActivityCounter counter = 4 [(gogoproto.nullable) = false];
+}
+
+// GenesisState defines the network module's genesis state. The denormalized
+// structures (operator set, operator-node index, per-operator node counts,
+// and the recent-activity index) are derived from nodes and activation_keys
+// on import rather than exported, so they can never disagree with the
+// primary records.
+message GenesisState {
+  // params are the module parameters.
+  Params params = 1 [(gogoproto.nullable) = false];
+  // nodes are all node records, active and deactivated.
+  repeated Node nodes = 2 [(gogoproto.nullable) = false];
+  // activation_keys are all activation key records, active and disabled.
+  repeated ActivationKey activation_keys = 3 [(gogoproto.nullable) = false];
+  // node_status_counters are the per-node daily status-update counters.
+  repeated NodeStatusCounter node_status_counters = 4 [(gogoproto.nullable) = false];
+  // gasless_counters are the ante-admission daily counters, exported so an
+  // export/import does not reset gasless quotas.
+  repeated GaslessCounter gasless_counters = 5 [(gogoproto.nullable) = false];
+  // node_types are the registered node types. Every node's type must name one
+  // of these; the license-type binding cannot be checked here, because that
+  // record lives in x/license.
+  repeated NodeType node_types = 6 [(gogoproto.nullable) = false];
+  // grants are the access grants held within this module. This module does not
+  // scope its actions, so every grant carries the empty scope.
+  repeated access.v1.Grant grants = 7 [(gogoproto.nullable) = false];
+}

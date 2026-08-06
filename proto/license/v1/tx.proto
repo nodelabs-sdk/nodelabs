@@ -1,0 +1,246 @@
+syntax = "proto3";
+package license.v1;
+
+import "access/v1/access.proto";
+import "amino/amino.proto";
+import "cosmos/msg/v1/msg.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "license/v1/license.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/license/types";
+
+// Msg defines the Msg service. The module owner is a parameter and the access
+// grants it hands out live in this module's own state; the signer checks below
+// consult both.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  // CreateLicenseType creates a new license type. Signer must hold the
+  // module-wide "type.create" grant; owning the module is not sufficient on
+  // its own.
+  rpc CreateLicenseType(MsgCreateLicenseType) returns (MsgCreateLicenseTypeResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/create_license_type"
+      body: "*"
+    };
+  }
+
+  // IssueLicenses issues one or more licenses. Signer must have the "issue" grant for the license type.
+  rpc IssueLicenses(MsgIssueLicenses) returns (MsgIssueLicensesResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/issue_licenses"
+      body: "*"
+    };
+  }
+
+  // RevokeLicenses revokes the licenses with the given ids.
+  // Signer must have the "revoke" grant for the license type.
+  rpc RevokeLicenses(MsgRevokeLicenses) returns (MsgRevokeLicensesResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/revoke_licenses"
+      body: "*"
+    };
+  }
+
+  // UpdateLicenseType updates an existing license type. Signer must be the module owner.
+  rpc UpdateLicenseType(MsgUpdateLicenseType) returns (MsgUpdateLicenseTypeResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/update_license_type"
+      body: "*"
+    };
+  }
+
+  // UpdateParams updates the module parameters, including the module owner.
+  // Signer must be the module authority (governance). It is how an owner is
+  // first established outside genesis, and how a lost or compromised owner key
+  // is recovered without its cooperation.
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/update_params"
+      body: "*"
+    };
+  }
+
+  // TransferOwnership hands the module to a new owner. Signer must be the
+  // current owner. It writes only the owner parameter, leaving every other
+  // parameter untouched.
+  rpc TransferOwnership(MsgTransferOwnership) returns (MsgTransferOwnershipResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/transfer_ownership"
+      body: "*"
+    };
+  }
+
+  // GrantAccess merges access grants for a grantee. Signer must be the module
+  // owner. Existing grants are preserved; new (action, scope) pairs are
+  // unioned in.
+  rpc GrantAccess(MsgGrantAccess) returns (MsgGrantAccessResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/grant_access"
+      body: "*"
+    };
+  }
+
+  // RevokeAccess removes the given (action, scope) pairs from a grantee. Pairs
+  // that are not currently granted are silently ignored. Signer must be the
+  // module owner.
+  rpc RevokeAccess(MsgRevokeAccess) returns (MsgRevokeAccessResponse) {
+    option (google.api.http) = {
+      post: "/nodelabs/license/tx/revoke_access"
+      body: "*"
+    };
+  }
+}
+
+// MsgCreateLicenseType is the Msg/CreateLicenseType request type.
+message MsgCreateLicenseType {
+  option (cosmos.msg.v1.signer) = "creator";
+  option (amino.name) = "nodelabs/x/license/MsgCreateLicenseType";
+
+  // creator is the signer and must hold the module-wide "type.create" grant.
+  // It is not the module owner: ownership confers the right to delegate the
+  // action, not the action itself. The address is not recorded on the license
+  // type.
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string id = 2;
+  bool transferrable = 3;
+  string max_supply = 4 [
+    (cosmos_proto.scalar) = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}
+
+// MsgCreateLicenseTypeResponse is the Msg/CreateLicenseType response type.
+message MsgCreateLicenseTypeResponse {}
+
+// IssueLicenseEntry defines a single issuance within a MsgIssueLicenses.
+message IssueLicenseEntry {
+  string license_type_id = 1;
+  string holder = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string start_date = 3;
+  string end_date = 4;
+  uint64 count = 5;
+}
+
+// MsgIssueLicenses is the Msg/IssueLicenses request type.
+message MsgIssueLicenses {
+  option (cosmos.msg.v1.signer) = "issuer";
+  option (amino.name) = "nodelabs/x/license/MsgIssueLicenses";
+
+  string issuer = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  repeated IssueLicenseEntry entries = 2 [(gogoproto.nullable) = false];
+}
+
+// MsgIssueLicensesResponse is the Msg/IssueLicenses response type.
+// Ids are the issued license ids, flattened in entry order. Ids are unique
+// chain-wide, so each one identifies its license without its type.
+message MsgIssueLicensesResponse {
+  repeated uint64 ids = 1;
+}
+
+// MsgRevokeLicenses is the Msg/RevokeLicenses request type.
+message MsgRevokeLicenses {
+  option (cosmos.msg.v1.signer) = "revoker";
+  option (amino.name) = "nodelabs/x/license/MsgRevokeLicenses";
+
+  string revoker = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string license_type_id = 2;
+  // license_ids are the ids of the licenses to revoke. Each must be an active
+  // license of license_type_id. Duplicates are rejected.
+  repeated uint64 license_ids = 3;
+}
+
+// MsgRevokeLicensesResponse is the Msg/RevokeLicenses response type.
+// Ids are unique chain-wide, so each one identifies its license without its
+// type.
+message MsgRevokeLicensesResponse {
+  repeated uint64 ids = 1;
+}
+
+// MsgUpdateLicenseType is the Msg/UpdateLicenseType request type. Only the
+// transferrable flag can be updated; max_supply is fixed at creation.
+message MsgUpdateLicenseType {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/license/MsgUpdateLicenseType";
+
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string id = 2;
+  bool transferrable = 3;
+}
+
+// MsgUpdateLicenseTypeResponse is the Msg/UpdateLicenseType response type.
+message MsgUpdateLicenseTypeResponse {}
+
+// MsgUpdateParams is the Msg/UpdateParams request type.
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name) = "nodelabs/x/license/MsgUpdateParams";
+
+  // authority is the address that controls the module (defaults to x/gov).
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // params defines the module parameters to update. All parameters must be
+  // supplied.
+  Params params = 2 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}
+
+// MsgUpdateParamsResponse is the Msg/UpdateParams response type.
+message MsgUpdateParamsResponse {}
+
+// MsgTransferOwnership is the Msg/TransferOwnership request type. It is the
+// only message that lets a non-authority signer write a parameter, and it
+// writes just the one: the rest of the parameter set is read back and
+// preserved.
+message MsgTransferOwnership {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/license/MsgTransferOwnership";
+
+  // owner is the signer and must be the current module owner.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // new_owner is the address to hand the module to.
+  string new_owner = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// MsgTransferOwnershipResponse is the Msg/TransferOwnership response type.
+message MsgTransferOwnershipResponse {}
+
+// MsgGrantAccess is the Msg/GrantAccess request type.
+message MsgGrantAccess {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/license/MsgGrantAccess";
+
+  // owner is the signer and must be the current module owner.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // grantee is the address receiving the grants.
+  string grantee = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // grants are the (action, scopes) entries to union onto the grantee. Scoped
+  // actions must name an existing license type; module-wide actions must carry
+  // no scopes.
+  repeated access.v1.ActionScopes grants = 3 [(gogoproto.nullable) = false];
+}
+
+// MsgGrantAccessResponse is the Msg/GrantAccess response type.
+message MsgGrantAccessResponse {}
+
+// MsgRevokeAccess is the Msg/RevokeAccess request type.
+message MsgRevokeAccess {
+  option (cosmos.msg.v1.signer) = "owner";
+  option (amino.name) = "nodelabs/x/license/MsgRevokeAccess";
+
+  // owner is the signer and must be the current module owner.
+  string owner = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // grantee is the address to remove grants from.
+  string grantee = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // actions are the (action, scope) pairs to remove. Pairs that are not
+  // granted are ignored.
+  repeated access.v1.ActionScope actions = 3 [(gogoproto.nullable) = false];
+}
+
+// MsgRevokeAccessResponse is the Msg/RevokeAccess response type.
+message MsgRevokeAccessResponse {}

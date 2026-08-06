@@ -1,0 +1,268 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "LicenseI",
+  "sourceName": "solidity/precompiles/licenses/LicenseI.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "string", "name": "id", "type": "string" },
+        { "indexed": false, "internalType": "bool", "name": "transferrable", "type": "bool" },
+        { "indexed": false, "internalType": "uint256", "name": "maxSupply", "type": "uint256" }
+      ],
+      "name": "LicenseTypeCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "string", "name": "id", "type": "string" },
+        { "indexed": false, "internalType": "bool", "name": "transferrable", "type": "bool" }
+      ],
+      "name": "LicenseTypeUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "issuer", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "holder", "type": "address" },
+        { "indexed": false, "internalType": "string", "name": "licenseTypeId", "type": "string" },
+        { "indexed": false, "internalType": "uint64", "name": "count", "type": "uint64" }
+      ],
+      "name": "LicenseIssued",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "revoker", "type": "address" },
+        { "indexed": false, "internalType": "string", "name": "licenseTypeId", "type": "string" },
+        { "indexed": false, "internalType": "uint64[]", "name": "licenseIds", "type": "uint64[]" }
+      ],
+      "name": "LicenseRevoked",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "id", "type": "string" },
+        { "internalType": "bool", "name": "transferrable", "type": "bool" },
+        { "internalType": "uint256", "name": "maxSupply", "type": "uint256" }
+      ],
+      "name": "createLicenseType",
+      "outputs": [
+        { "internalType": "bool", "name": "success", "type": "bool" }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "id", "type": "string" },
+        { "internalType": "bool", "name": "transferrable", "type": "bool" }
+      ],
+      "name": "updateLicenseType",
+      "outputs": [
+        { "internalType": "bool", "name": "success", "type": "bool" }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            { "internalType": "string", "name": "licenseTypeId", "type": "string" },
+            { "internalType": "address", "name": "holder", "type": "address" },
+            { "internalType": "string", "name": "startDate", "type": "string" },
+            { "internalType": "string", "name": "endDate", "type": "string" },
+            { "internalType": "uint64", "name": "count", "type": "uint64" }
+          ],
+          "internalType": "struct IssueLicenseEntry[]",
+          "name": "entries",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "issueLicenses",
+      "outputs": [
+        { "internalType": "uint64[]", "name": "ids", "type": "uint64[]" }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "licenseTypeId", "type": "string" },
+        { "internalType": "uint64[]", "name": "licenseIds", "type": "uint64[]" }
+      ],
+      "name": "revokeLicenses",
+      "outputs": [
+        { "internalType": "uint64[]", "name": "ids", "type": "uint64[]" }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "id", "type": "string" }
+      ],
+      "name": "licenseType",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "string", "name": "id", "type": "string" },
+            { "internalType": "bool", "name": "transferrable", "type": "bool" },
+            { "internalType": "uint256", "name": "maxSupply", "type": "uint256" },
+            { "internalType": "uint256", "name": "issuedCount", "type": "uint256" },
+            { "internalType": "uint256", "name": "activeCount", "type": "uint256" },
+            { "internalType": "uint256", "name": "revokedCount", "type": "uint256" }
+          ],
+          "internalType": "struct LicenseType",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "licenseTypes",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "string", "name": "id", "type": "string" },
+            { "internalType": "bool", "name": "transferrable", "type": "bool" },
+            { "internalType": "uint256", "name": "maxSupply", "type": "uint256" },
+            { "internalType": "uint256", "name": "issuedCount", "type": "uint256" },
+            { "internalType": "uint256", "name": "activeCount", "type": "uint256" },
+            { "internalType": "uint256", "name": "revokedCount", "type": "uint256" }
+          ],
+          "internalType": "struct LicenseType[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "licenses",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "uint64", "name": "id", "type": "uint64" },
+            { "internalType": "string", "name": "typeId", "type": "string" },
+            { "internalType": "address", "name": "holder", "type": "address" },
+            { "internalType": "string", "name": "startDate", "type": "string" },
+            { "internalType": "string", "name": "endDate", "type": "string" },
+            { "internalType": "string", "name": "status", "type": "string" }
+          ],
+          "internalType": "struct License[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint64", "name": "id", "type": "uint64" }
+      ],
+      "name": "license",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "uint64", "name": "id", "type": "uint64" },
+            { "internalType": "string", "name": "typeId", "type": "string" },
+            { "internalType": "address", "name": "holder", "type": "address" },
+            { "internalType": "string", "name": "startDate", "type": "string" },
+            { "internalType": "string", "name": "endDate", "type": "string" },
+            { "internalType": "string", "name": "status", "type": "string" }
+          ],
+          "internalType": "struct License",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "typeId", "type": "string" }
+      ],
+      "name": "licensesByType",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "uint64", "name": "id", "type": "uint64" },
+            { "internalType": "string", "name": "typeId", "type": "string" },
+            { "internalType": "address", "name": "holder", "type": "address" },
+            { "internalType": "string", "name": "startDate", "type": "string" },
+            { "internalType": "string", "name": "endDate", "type": "string" },
+            { "internalType": "string", "name": "status", "type": "string" }
+          ],
+          "internalType": "struct License[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "holder", "type": "address" }
+      ],
+      "name": "licensesByHolder",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "uint64", "name": "id", "type": "uint64" },
+            { "internalType": "string", "name": "typeId", "type": "string" },
+            { "internalType": "address", "name": "holder", "type": "address" },
+            { "internalType": "string", "name": "startDate", "type": "string" },
+            { "internalType": "string", "name": "endDate", "type": "string" },
+            { "internalType": "string", "name": "status", "type": "string" }
+          ],
+          "internalType": "struct License[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "holder", "type": "address" },
+        { "internalType": "string", "name": "typeId", "type": "string" }
+      ],
+      "name": "licensesByHolderAndType",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "uint64", "name": "id", "type": "uint64" },
+            { "internalType": "string", "name": "typeId", "type": "string" },
+            { "internalType": "address", "name": "holder", "type": "address" },
+            { "internalType": "string", "name": "startDate", "type": "string" },
+            { "internalType": "string", "name": "endDate", "type": "string" },
+            { "internalType": "string", "name": "status", "type": "string" }
+          ],
+          "internalType": "struct License[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

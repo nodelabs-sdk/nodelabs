@@ -1,0 +1,46 @@
+syntax = "proto3";
+package license.v1;
+
+import "amino/amino.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/license/types";
+
+// LicenseType defines a template for issuing licenses.
+message LicenseType {
+  // id is the owner-supplied identifier, e.g. "nodelabs.node".
+  string id = 1;
+  // transferrable indicates whether holders may transfer this license type.
+  bool transferrable = 2;
+  // max_supply is the maximum number of licenses outstanding at once, checked
+  // against active_count. Revoking frees a slot, so lifetime issued_count may
+  // exceed it. 0 = unlimited.
+  string max_supply = 3 [
+    (cosmos_proto.scalar) = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+  // issued_count tracks the total number of licenses issued (used for ID generation).
+  string issued_count = 4 [
+    (cosmos_proto.scalar) = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+  // active_count tracks the number of currently active licenses.
+  string active_count = 5 [
+    (cosmos_proto.scalar) = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+  // revoked_count tracks the number of revoked licenses.
+  string revoked_count = 6 [
+    (cosmos_proto.scalar) = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}

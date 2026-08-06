@@ -1,0 +1,242 @@
+syntax = "proto3";
+package license.v1;
+
+import "access/v1/access.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "license/v1/license.proto";
+import "license/v1/license_type.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/license/types";
+
+// Query defines the gRPC querier service.
+service Query {
+  // Params queries the module parameters, including the module owner.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/nodelabs/license/params";
+  }
+
+  // Actions queries the action vocabulary this module recognises. It is
+  // compiled into the binary rather than stored, so the answer is the same for
+  // every node running this version.
+  rpc Actions(QueryActionsRequest) returns (QueryActionsResponse) {
+    option (google.api.http).get = "/nodelabs/license/actions";
+  }
+
+  // Grants queries every access grant in the module.
+  rpc Grants(QueryGrantsRequest) returns (QueryGrantsResponse) {
+    option (google.api.http).get = "/nodelabs/license/grants";
+  }
+
+  // GrantsByGrantee queries the grants held by an address.
+  rpc GrantsByGrantee(QueryGrantsByGranteeRequest) returns (QueryGrantsByGranteeResponse) {
+    option (google.api.http).get = "/nodelabs/license/grants/{grantee}";
+  }
+
+  // GrantsByScope queries the grants that apply to a license type, optionally
+  // narrowed to a single action.
+  rpc GrantsByScope(QueryGrantsByScopeRequest) returns (QueryGrantsByScopeResponse) {
+    option (google.api.http).get = "/nodelabs/license/grants_by_scope/{scope}";
+  }
+
+  // Can reports whether a grantee holds an (action, scope) grant.
+  rpc Can(QueryCanRequest) returns (QueryCanResponse) {
+    option (google.api.http).get = "/nodelabs/license/can/{grantee}/{action}";
+  }
+
+  // LicenseType queries a license type by id.
+  rpc LicenseType(QueryLicenseTypeRequest) returns (QueryLicenseTypeResponse) {
+    option (google.api.http).get = "/nodelabs/license/license_type/{id}";
+  }
+
+  // LicenseTypes queries all license types.
+  rpc LicenseTypes(QueryLicenseTypesRequest) returns (QueryLicenseTypesResponse) {
+    option (google.api.http).get = "/nodelabs/license/license_types";
+  }
+
+  // License queries a license by id. Ids are unique chain-wide, so no license
+  // type is needed to resolve one.
+  rpc License(QueryLicenseRequest) returns (QueryLicenseResponse) {
+    option (google.api.http).get = "/nodelabs/license/license/{id}";
+  }
+
+  // Licenses queries all licenses across all license types, active and revoked.
+  rpc Licenses(QueryLicensesRequest) returns (QueryLicensesResponse) {
+    option (google.api.http).get = "/nodelabs/license/licenses";
+  }
+
+  // LicensesByType queries all licenses for a given license type.
+  rpc LicensesByType(QueryLicensesByTypeRequest) returns (QueryLicensesByTypeResponse) {
+    option (google.api.http).get = "/nodelabs/license/licenses_by_type/{type_id}";
+  }
+
+  // LicensesByHolder queries the active licenses held by a given address.
+  // Revoked licenses are not indexed by holder; use License or LicensesByType
+  // to look them up.
+  rpc LicensesByHolder(QueryLicensesByHolderRequest) returns (QueryLicensesByHolderResponse) {
+    option (google.api.http).get = "/nodelabs/license/licenses_by_holder/{holder}";
+  }
+
+  // LicensesByHolderAndType queries the active licenses held by a given
+  // address for a specific type. Revoked licenses are not indexed by holder;
+  // use License or LicensesByType to look them up.
+  rpc LicensesByHolderAndType(QueryLicensesByHolderAndTypeRequest) returns (QueryLicensesByHolderAndTypeResponse) {
+    option (google.api.http).get = "/nodelabs/license/licenses_by_holder/{holder}/{type_id}";
+  }
+}
+
+// QueryParamsRequest is the request type for the Query/Params RPC method.
+message QueryParamsRequest {}
+
+// QueryParamsResponse is the response type for the Query/Params RPC method.
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryActionsRequest is the request type for the Query/Actions RPC method.
+message QueryActionsRequest {}
+
+// QueryActionsResponse is the response type for the Query/Actions RPC method.
+// The vocabulary is compiled in rather than stored, so this query is not
+// paginated.
+message QueryActionsResponse {
+  // actions is the full vocabulary, in ascending order.
+  repeated string actions = 1;
+  // unscoped is the subset of actions granted module-wide, whose grants must
+  // carry an empty scope. Every other action must name a license type.
+  repeated string unscoped = 2;
+}
+
+// QueryGrantsRequest is the request type for the Query/Grants RPC method.
+message QueryGrantsRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryGrantsResponse is the response type for the Query/Grants RPC method.
+message QueryGrantsResponse {
+  repeated access.v1.Grant grants = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryGrantsByGranteeRequest is the request type for the Query/GrantsByGrantee RPC method.
+message QueryGrantsByGranteeRequest {
+  string grantee = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryGrantsByGranteeResponse is the response type for the Query/GrantsByGrantee RPC method.
+message QueryGrantsByGranteeResponse {
+  repeated access.v1.Grant grants = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryGrantsByScopeRequest is the request type for the Query/GrantsByScope RPC method.
+message QueryGrantsByScopeRequest {
+  // scope is the license type id. The empty scope selects the module-wide
+  // grants; it is a real key component, not a wildcard.
+  string scope = 1;
+  // action optionally narrows the result to a single action.
+  string action = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+
+// QueryGrantsByScopeResponse is the response type for the Query/GrantsByScope RPC method.
+message QueryGrantsByScopeResponse {
+  repeated access.v1.Grant grants = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryCanRequest is the request type for the Query/Can RPC method.
+message QueryCanRequest {
+  string grantee = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string action = 2;
+  // scope is the license type id, empty for a module-wide action.
+  string scope = 3;
+}
+
+// QueryCanResponse is the response type for the Query/Can RPC method.
+message QueryCanResponse {
+  bool can = 1;
+}
+
+// QueryLicenseTypeRequest is the request type for the Query/LicenseType RPC method.
+message QueryLicenseTypeRequest {
+  string id = 1;
+}
+
+// QueryLicenseTypeResponse is the response type for the Query/LicenseType RPC method.
+message QueryLicenseTypeResponse {
+  LicenseType license_type = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryLicenseTypesRequest is the request type for the Query/LicenseTypes RPC method.
+message QueryLicenseTypesRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryLicenseTypesResponse is the response type for the Query/LicenseTypes RPC method.
+message QueryLicenseTypesResponse {
+  repeated LicenseType license_types = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryLicenseRequest is the request type for the Query/License RPC method.
+message QueryLicenseRequest {
+  // id is the chain-wide unique license id.
+  uint64 id = 1;
+}
+
+// QueryLicenseResponse is the response type for the Query/License RPC method.
+message QueryLicenseResponse {
+  License license = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryLicensesRequest is the request type for the Query/Licenses RPC method.
+message QueryLicensesRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryLicensesResponse is the response type for the Query/Licenses RPC method.
+message QueryLicensesResponse {
+  repeated License licenses = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryLicensesByTypeRequest is the request type for the Query/LicensesByType RPC method.
+message QueryLicensesByTypeRequest {
+  string type_id = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryLicensesByTypeResponse is the response type for the Query/LicensesByType RPC method.
+message QueryLicensesByTypeResponse {
+  repeated License licenses = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryLicensesByHolderRequest is the request type for the Query/LicensesByHolder RPC method.
+message QueryLicensesByHolderRequest {
+  string holder = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryLicensesByHolderResponse is the response type for the Query/LicensesByHolder RPC method.
+message QueryLicensesByHolderResponse {
+  repeated License licenses = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryLicensesByHolderAndTypeRequest is the request type for the Query/LicensesByHolderAndType RPC method.
+message QueryLicensesByHolderAndTypeRequest {
+  string holder = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string type_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+
+// QueryLicensesByHolderAndTypeResponse is the response type for the Query/LicensesByHolderAndType RPC method.
+message QueryLicensesByHolderAndTypeResponse {
+  repeated License licenses = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}

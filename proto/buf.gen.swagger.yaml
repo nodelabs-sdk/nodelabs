@@ -1,0 +1,16 @@
+version: v1
+plugins:
+  # protoc-gen-swagger is grpc-gateway v1's OpenAPI v2 generator; that is the
+  # plugin name shipped in the cosmos proto-builder image.
+  #
+  # No allow_merge: buf invokes the plugin once per module, so a merged output
+  # name would collide and buf would silently drop all but one module. Each
+  # proto gets its own document and swagger-combine merges them below.
+  #
+  # fqn_for_swagger_name is load-bearing: license.v1 and network.v1 both define
+  # QueryParamsResponse, QueryGrantsResponse and friends. Without fully
+  # qualified definition names they collide and one silently overwrites the
+  # other.
+  - name: swagger
+    out: ../tmp-swagger-gen
+    opt: logtostderr=true,fqn_for_swagger_name=true,simple_operation_ids=false

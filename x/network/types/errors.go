@@ -1,0 +1,30 @@
+package types
+
+import "cosmossdk.io/errors"
+
+var (
+	ErrInvalidSigner         = errors.Register(ModuleName, 1100, "invalid signer address")
+	ErrUnauthorized          = errors.Register(ModuleName, 1101, "signer is not authorized")
+	ErrNodeNotFound          = errors.Register(ModuleName, 1102, "node not found")
+	ErrNodeExists            = errors.Register(ModuleName, 1103, "node already activated")
+	ErrNodeDeactivated       = errors.Register(ModuleName, 1104, "node is deactivated")
+	ErrKeyNotFound           = errors.Register(ModuleName, 1105, "activation key not found")
+	ErrKeyExists             = errors.Register(ModuleName, 1106, "activation address has already been authorized")
+	ErrKeyDisabled           = errors.Register(ModuleName, 1107, "activation key is disabled")
+	ErrSelfAuthorization     = errors.Register(ModuleName, 1108, "activation address must differ from the operator wallet")
+	ErrTooManyActivationKeys = errors.Register(ModuleName, 1109, "active activation key limit reached")
+	ErrRecentKeyLimit        = errors.Register(ModuleName, 1110, "recent activation key limit reached")
+	ErrNoActiveLicenses      = errors.Register(ModuleName, 1111, "operator holds no active counted licenses")
+	ErrActivationLimit       = errors.Register(ModuleName, 1112, "activation limit exceeded")
+	ErrRecentActivationLimit = errors.Register(ModuleName, 1113, "recent activation limit exceeded")
+	ErrInvalidNodeType       = errors.Register(ModuleName, 1114, "invalid node type")
+	ErrAccountExists         = errors.Register(ModuleName, 1115, "account already exists")
+	ErrQuotaExceeded         = errors.Register(ModuleName, 1116, "daily gasless quota exceeded")
+	ErrInvalidStatusPayload  = errors.Register(ModuleName, 1117, "invalid node status payload")
+	ErrInvalidAddress        = errors.Register(ModuleName, 1118, "invalid address")
+	ErrNodeTypeExists        = errors.Register(ModuleName, 1119, "node type already registered")
+	ErrNodeTypeNotFound      = errors.Register(ModuleName, 1120, "node type not found")
+	ErrLicenseTypeNotFound   = errors.Register(ModuleName, 1121, "license type not found")
+	ErrLicenseTypeBound      = errors.Register(ModuleName, 1122, "license type already backs a node type")
+	ErrOwnerNotSet           = errors.Register(ModuleName, 1123, "module owner is not set")
+)

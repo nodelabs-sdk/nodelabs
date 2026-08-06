@@ -1,0 +1,27 @@
+syntax = "proto3";
+package license.v1;
+
+import "access/v1/access.proto";
+import "gogoproto/gogo.proto";
+import "license/v1/license.proto";
+import "license/v1/license_type.proto";
+
+option go_package = "github.com/nodelabs-sdk/nodelabs/x/license/types";
+
+// GenesisState defines the licenses module's genesis state.
+message GenesisState {
+  repeated LicenseType license_types = 1 [(gogoproto.nullable) = false];
+  repeated License licenses = 2 [(gogoproto.nullable) = false];
+  // next_license_id is the id that will be assigned to the next issued
+  // license. It is exported explicitly rather than derived from the licenses
+  // above or from LicenseType.issued_count, so the id sequence and the stats
+  // counters remain independent concepts. It must be at least 1 and greater
+  // than every license id in this genesis.
+  uint64 next_license_id = 3;
+  // params are the module parameters, including the module owner.
+  Params params = 4 [(gogoproto.nullable) = false];
+  // grants are the access grants held within this module. Scoped grants name
+  // a license type in license_types above; because both live in this document,
+  // that reference is checked during stateless validation.
+  repeated access.v1.Grant grants = 5 [(gogoproto.nullable) = false];
+}

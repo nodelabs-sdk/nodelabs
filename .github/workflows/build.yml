@@ -1,0 +1,182 @@
+name: Build Multi-Platform Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 0.0.1)'
+        required: true
+        default: '0.0.1'
+      create_release:
+        description: 'Create GitHub release'
+        required: false
+        default: 'true'
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: 'true'
+
+jobs:
+  # Reuses the push/PR test workflow so a release can never ship a red build.
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+            name: nodelabsd-linux
+            cc: gcc
+          - goos: darwin
+            goarch: arm64
+            runner: macos-latest
+            name: nodelabsd-darwin-arm64
+            cc: clang
+          - goos: darwin
+            goarch: amd64
+            runner: macos-14
+            name: nodelabsd-darwin-amd64
+            cc: clang
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+            name: nodelabsd-windows.exe
+            cc: x86_64-w64-mingw32-gcc
+            windows: true
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+    - name: Validate version format
+      run: |
+        VERSION="${{ github.event.inputs.version || '0.0.1' }}"
+        if ! echo "$VERSION" | grep -qE '^0\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+          echo "::error::Version must be 0.x.y format (no major versions). Got: $VERSION"
+          exit 1
+        fi
+
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.8'
+        cache: true
+
+    - name: Install mingw-w64 (Windows cross-compile)
+      if: matrix.windows
+      run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+
+    - name: Build ${{ matrix.name }}
+      env:
+        VERSION: ${{ github.event.inputs.version || '0.0.1' }}
+        GOOS: ${{ matrix.windows && 'windows' || matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 1
+        CC: ${{ matrix.cc }}
+      run: |
+        COMMIT=$(git rev-parse --short HEAD)
+        go build \
+          -ldflags "-s -w \
+            -X github.com/cosmos/cosmos-sdk/version.Version=v$VERSION \
+            -X github.com/cosmos/cosmos-sdk/version.Commit=$COMMIT \
+            -X github.com/cosmos/cosmos-sdk/version.AppName=nodelabsd \
+            -X github.com/cosmos/cosmos-sdk/version.Name=nodelabs \
+            -X github.com/cosmos/cosmos-sdk/version.BuildTags=${{ matrix.goos }},${{ matrix.goarch }}" \
+          -o build/${{ matrix.name }} \
+          ./cmd/nodelabsd
+        ls -la build/
+
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v5
+      with:
+        name: ${{ matrix.name }}-${{ github.event.inputs.version || '0.0.1' }}
+        path: build/${{ matrix.name }}
+        retention-days: 30
+
+    - name: Show binary info
+      if: matrix.goos == 'linux' && !matrix.windows
+      run: |
+        echo "Binary size:"
+        ls -lh build/${{ matrix.name }}
+        echo "Binary version info:"
+        ./build/${{ matrix.name }} version
+
+  release:
+    needs: build
+    if: github.event.inputs.create_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: artifacts/
+
+    - name: Prepare release files
+      run: |
+        mkdir -p release
+        cp artifacts/nodelabsd-linux-${{ github.event.inputs.version || '0.0.1' }}/nodelabsd-linux release/
+        cp artifacts/nodelabsd-darwin-arm64-${{ github.event.inputs.version || '0.0.1' }}/nodelabsd-darwin-arm64 release/
+        cp artifacts/nodelabsd-darwin-amd64-${{ github.event.inputs.version || '0.0.1' }}/nodelabsd-darwin-amd64 release/
+        cp artifacts/nodelabsd-windows.exe-${{ github.event.inputs.version || '0.0.1' }}/nodelabsd-windows.exe release/
+        ls -la release/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.event.inputs.version || '0.0.1' }}
+        name: v${{ github.event.inputs.version || '0.0.1' }}
+        body: |
+          ## v${{ github.event.inputs.version || '0.0.1' }}
+
+          ### Downloads
+          - **Linux (x86_64)**: `nodelabsd-linux`
+          - **macOS (Apple Silicon)**: `nodelabsd-darwin-arm64`
+          - **macOS (Intel)**: `nodelabsd-darwin-amd64`
+          - **Windows (x86_64)**: `nodelabsd-windows.exe`
+
+          ### Installation
+
+          #### Linux/macOS
+          ```bash
+          chmod +x nodelabsd-*
+          sudo mv nodelabsd-* /usr/local/bin/nodelabsd
+          ```
+
+          #### Windows
+          ```powershell
+          # Download nodelabsd-windows.exe and add to PATH
+          ```
+
+          ### Version Info
+          Built with Go 1.23.8 | Cosmos SDK v0.53.x | Cosmos EVM v0.5.1
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+        files: |
+          release/nodelabsd-linux
+          release/nodelabsd-darwin-arm64
+          release/nodelabsd-darwin-amd64
+          release/nodelabsd-windows.exe
+        token: ${{ secrets.GITHUB_TOKEN }}
