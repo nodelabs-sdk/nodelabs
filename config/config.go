@@ -1,10 +1,12 @@
 package config
 
 import (
-	evmconfig "github.com/cosmos/evm/config"
-
 	clienthelpers "cosmossdk.io/client/v2/helpers"
+	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/evm/crypto/hd"
+	cosmosevmserverconfig "github.com/cosmos/evm/server/config"
+	"github.com/cosmos/evm/utils"
 )
 
 const (
@@ -37,19 +39,62 @@ func MustGetDefaultNodeHome() string {
 }
 
 // SetBech32Prefixes installs nodelabs's bech32 prefixes on the global SDK config.
-// Upstream's evmconfig.SetBech32Prefixes hard-codes "cosmos"; we override here so
-// CLI tooling (keys add, query, tx) emits nodelabs-prefixed addresses.
+// Upstream's SetBech32Prefixes hard-codes "cosmos"; we override here so CLI
+// tooling (keys add, query, tx) emits nodelabs-prefixed addresses.
 func SetBech32Prefixes(config *sdk.Config) {
 	config.SetBech32PrefixForAccount(Bech32PrefixAccAddr, Bech32PrefixAccPub)
 	config.SetBech32PrefixForValidator(Bech32PrefixValAddr, Bech32PrefixValPub)
 	config.SetBech32PrefixForConsensusNode(Bech32PrefixConsAddr, Bech32PrefixConsPub)
 }
 
-// SetBip44CoinType wraps the cosmos evm config SetBip44CoinType.
-var SetBip44CoinType = evmconfig.SetBip44CoinType
+// SetBip44CoinType sets the global coin type to be used in hierarchical
+// deterministic wallets.
+//
+// Vendored from cosmos/evm's evmd/config (the top-level evm/config package was
+// removed in v0.7); evmd/config lives in a nested Go module we don't want to
+// depend on.
+func SetBip44CoinType(config *sdk.Config) {
+	config.SetCoinType(hd.Bip44CoinType)
+	config.SetPurpose(sdk.Purpose)               // Shared
+	config.SetFullFundraiserPath(hd.BIP44HDPath) //nolint:staticcheck
+}
 
-// InitAppConfig wraps the cosmos evm config InitAppConfig.
-var InitAppConfig = evmconfig.InitAppConfig
+// InitAppConfig helps to override default appConfig template and configs.
+//
+// Vendored from cosmos/evm's evmd/config for the same reason as
+// SetBip44CoinType.
+func InitAppConfig(denom string, evmChainID uint64) (string, interface{}) {
+	srvCfg := serverconfig.DefaultConfig()
+	// The SDK's default minimum gas price is set to "" (empty value) inside
+	// app.toml, which would make the node halt on startup if left untouched.
+	srvCfg.MinGasPrices = "0" + denom
 
-// GetChainIDFromHome wraps the cosmos evm config GetChainIDFromHome.
-var GetChainIDFromHome = evmconfig.GetChainIDFromHome
+	evmCfg := cosmosevmserverconfig.DefaultEVMConfig()
+	evmCfg.EVMChainID = evmChainID
+
+	customAppConfig := EVMAppConfig{
+		Config:  *srvCfg,
+		EVM:     *evmCfg,
+		JSONRPC: *cosmosevmserverconfig.DefaultJSONRPCConfig(),
+		TLS:     *cosmosevmserverconfig.DefaultTLSConfig(),
+	}
+
+	return EVMAppTemplate, customAppConfig
+}
+
+// EVMAppConfig is the app.toml layout: the SDK server config extended with the
+// cosmos/evm EVM, JSON-RPC and TLS sections.
+type EVMAppConfig struct {
+	serverconfig.Config
+
+	EVM     cosmosevmserverconfig.EVMConfig
+	JSONRPC cosmosevmserverconfig.JSONRPCConfig
+	TLS     cosmosevmserverconfig.TLSConfig
+}
+
+// EVMAppTemplate is the app.toml template matching EVMAppConfig.
+const EVMAppTemplate = serverconfig.DefaultConfigTemplate + cosmosevmserverconfig.DefaultEVMConfigTemplate
+
+// GetChainIDFromHome returns the chain id from the client config in the given
+// home directory. (Moved upstream from evm/config to evm/utils in v0.7.)
+var GetChainIDFromHome = utils.GetChainIDFromHome

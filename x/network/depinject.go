@@ -12,7 +12,7 @@ import (
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/store"
 	"cosmossdk.io/depinject"
-	"cosmossdk.io/log"
+	"cosmossdk.io/log/v2"
 
 	modulev1 "github.com/nodelabs-sdk/nodelabs/api/network/module/v1"
 	licensekeeper "github.com/nodelabs-sdk/nodelabs/x/license/keeper"

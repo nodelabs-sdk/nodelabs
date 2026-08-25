@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"io"
 	"os"
 
 	"github.com/cosmos/evm/x/vm/types"
@@ -17,15 +16,14 @@ import (
 	dbm "github.com/cosmos/cosmos-db"
 	cosmosevmcmd "github.com/cosmos/evm/client"
 	evmdebug "github.com/cosmos/evm/client/debug"
-	evmconfig "github.com/cosmos/evm/config"
 	"github.com/cosmos/evm/crypto/hd"
 	cosmosevmserver "github.com/cosmos/evm/server"
 	srvflags "github.com/cosmos/evm/server/flags"
 
-	"cosmossdk.io/log"
-	"cosmossdk.io/store"
-	snapshottypes "cosmossdk.io/store/snapshots/types"
-	storetypes "cosmossdk.io/store/types"
+	"cosmossdk.io/log/v2"
+	"github.com/cosmos/cosmos-sdk/store/v2"
+	snapshottypes "github.com/cosmos/cosmos-sdk/store/v2/snapshots/types"
+	storetypes "github.com/cosmos/cosmos-sdk/store/v2/types"
 	confixcmd "cosmossdk.io/tools/confix/cmd"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -56,7 +54,6 @@ func NewRootCmd() *cobra.Command {
 	tempApp := app.NewApp(
 		log.NewNopLogger(),
 		dbm.NewMemDB(),
-		nil,
 		true,
 		simtestutil.EmptyAppOptions{},
 	)
@@ -120,7 +117,7 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			customAppTemplate, customAppConfig := evmconfig.InitAppConfig(types.DefaultEVMExtendedDenom, evmconfig.EVMChainID)
+			customAppTemplate, customAppConfig := appconfig.InitAppConfig(types.DefaultEVMExtendedDenom, types.DefaultEVMChainID)
 			customTMConfig := initCometConfig()
 
 			return sdkserver.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig)
@@ -150,8 +147,8 @@ func initRootCmd(rootCmd *cobra.Command, nodelabsApp *app.NodelabsApp) {
 	cfg.Seal()
 
 	defaultNodeHome := appconfig.MustGetDefaultNodeHome()
-	sdkAppCreator := func(l log.Logger, d dbm.DB, w io.Writer, ao servertypes.AppOptions) servertypes.Application {
-		return newApp(l, d, w, ao)
+	sdkAppCreator := func(l log.Logger, d dbm.DB, ao servertypes.AppOptions) servertypes.Application {
+		return newApp(l, d, ao)
 	}
 	rootCmd.AddCommand(
 		genutilcli.InitCmd(nodelabsApp.BasicModuleManager, defaultNodeHome),
@@ -245,7 +242,6 @@ func txCommand() *cobra.Command {
 func newApp(
 	logger log.Logger,
 	db dbm.DB,
-	traceStore io.Writer,
 	appOpts servertypes.AppOptions,
 ) cosmosevmserver.Application {
 	var cache storetypes.MultiStorePersistentCache
@@ -291,7 +287,7 @@ func newApp(
 	}
 
 	return app.NewApp(
-		logger, db, traceStore, true,
+		logger, db, true,
 		appOpts,
 		baseappOptions...,
 	)
@@ -301,7 +297,6 @@ func newApp(
 func appExport(
 	logger log.Logger,
 	db dbm.DB,
-	traceStore io.Writer,
 	height int64,
 	forZeroHeight bool,
 	jailAllowedAddrs []string,
@@ -329,12 +324,12 @@ func appExport(
 	}
 
 	if height != -1 {
-		nodelabsApp = app.NewApp(logger, db, traceStore, false, appOpts, baseapp.SetChainID(chainID))
+		nodelabsApp = app.NewApp(logger, db, false, appOpts, baseapp.SetChainID(chainID))
 		if err := nodelabsApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
 	} else {
-		nodelabsApp = app.NewApp(logger, db, traceStore, true, appOpts, baseapp.SetChainID(chainID))
+		nodelabsApp = app.NewApp(logger, db, true, appOpts, baseapp.SetChainID(chainID))
 	}
 
 	return nodelabsApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs, modulesToExport)

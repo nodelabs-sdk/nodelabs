@@ -10,7 +10,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/trie/utils"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
@@ -104,6 +103,7 @@ type recordingStateDB struct {
 var _ vm.StateDB = (*recordingStateDB)(nil)
 
 func (s *recordingStateDB) AddLog(l *ethtypes.Log) { s.logs = append(s.logs, l) }
+func (s *recordingStateDB) EmitLogsForBurnAccounts() { panic("unexpected: EmitLogsForBurnAccounts") }
 
 // --- everything below this line is interface filler -----------------------
 
@@ -122,7 +122,9 @@ func (s *recordingStateDB) SetNonce(common.Address, uint64, tracing.NonceChangeR
 }
 func (s *recordingStateDB) GetCodeHash(common.Address) common.Hash { panic("unexpected: GetCodeHash") }
 func (s *recordingStateDB) GetCode(common.Address) []byte          { panic("unexpected: GetCode") }
-func (s *recordingStateDB) SetCode(common.Address, []byte) []byte  { panic("unexpected: SetCode") }
+func (s *recordingStateDB) SetCode(common.Address, []byte, tracing.CodeChangeReason) []byte {
+	panic("unexpected: SetCode")
+}
 func (s *recordingStateDB) GetCodeSize(common.Address) int         { panic("unexpected: GetCodeSize") }
 func (s *recordingStateDB) AddRefund(uint64)                       { panic("unexpected: AddRefund") }
 func (s *recordingStateDB) SubRefund(uint64)                       { panic("unexpected: SubRefund") }
@@ -146,16 +148,14 @@ func (s *recordingStateDB) GetTransientState(common.Address, common.Hash) common
 func (s *recordingStateDB) SetTransientState(common.Address, common.Hash, common.Hash) {
 	panic("unexpected: SetTransientState")
 }
-func (s *recordingStateDB) SelfDestruct(common.Address) uint256.Int {
-	panic("unexpected: SelfDestruct")
-}
+func (s *recordingStateDB) SelfDestruct(common.Address) { panic("unexpected: SelfDestruct") }
 func (s *recordingStateDB) HasSelfDestructed(common.Address) bool {
 	panic("unexpected: HasSelfDestructed")
 }
-func (s *recordingStateDB) SelfDestruct6780(common.Address) (uint256.Int, bool) {
-	panic("unexpected: SelfDestruct6780")
-}
 func (s *recordingStateDB) Exist(common.Address) bool { panic("unexpected: Exist") }
+func (s *recordingStateDB) IsNewContract(common.Address) bool {
+	panic("unexpected: IsNewContract")
+}
 func (s *recordingStateDB) Empty(common.Address) bool { panic("unexpected: Empty") }
 func (s *recordingStateDB) AddressInAccessList(common.Address) bool {
 	panic("unexpected: AddressInAccessList")
@@ -169,7 +169,6 @@ func (s *recordingStateDB) AddAddressToAccessList(common.Address) {
 func (s *recordingStateDB) AddSlotToAccessList(common.Address, common.Hash) {
 	panic("unexpected: AddSlotToAccessList")
 }
-func (s *recordingStateDB) PointCache() *utils.PointCache { panic("unexpected: PointCache") }
 func (s *recordingStateDB) Prepare(params.Rules, common.Address, common.Address, *common.Address, []common.Address, ethtypes.AccessList) {
 	panic("unexpected: Prepare")
 }

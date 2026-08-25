@@ -11,7 +11,7 @@ import (
 
 	"cosmossdk.io/collections"
 	storetypes "cosmossdk.io/core/store"
-	"cosmossdk.io/log"
+	"cosmossdk.io/log/v2"
 
 	accesskeeper "github.com/nodelabs-sdk/nodelabs/x/access/keeper"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"

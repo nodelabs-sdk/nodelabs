@@ -208,6 +208,9 @@ if [[ "$overwrite" == "y" || "$overwrite" == "Y" ]]; then
   sed -i.bak 's/timeout_precommit_delta = "500ms"/timeout_precommit_delta = "200ms"/g' "$CONFIG_TOML"
   sed -i.bak 's/timeout_commit = "5s"/timeout_commit = "1s"/g' "$CONFIG_TOML"
   sed -i.bak 's/timeout_broadcast_tx_commit = "10s"/timeout_broadcast_tx_commit = "5s"/g' "$CONFIG_TOML"
+  # Krakatoa (the cosmos/evm app-side mempool) requires CometBFT's app mempool
+  # type; the default "flood" makes the node refuse to start.
+  sed -i.bak 's/^type = "flood"/type = "app"/g' "$CONFIG_TOML"
 
   # Enable prometheus
   sed -i.bak 's/prometheus = false/prometheus = true/' "$CONFIG_TOML"

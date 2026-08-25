@@ -3,7 +3,6 @@ package app
 import (
 	"encoding/json"
 
-	"github.com/cosmos/evm/config"
 	testconstants "github.com/cosmos/evm/testutil/constants"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
@@ -45,7 +44,7 @@ func NewErc20GenesisState() *erc20types.GenesisState {
 // NewMintGenesisState returns the default genesis state for the mint module.
 func NewMintGenesisState() *minttypes.GenesisState {
 	mintGenState := minttypes.DefaultGenesisState()
-	mintGenState.Params.MintDenom = config.ExampleChainDenom
+	mintGenState.Params.MintDenom = testconstants.ExampleAttoDenom
 
 	return mintGenState
 }

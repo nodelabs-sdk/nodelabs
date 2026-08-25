@@ -1,7 +1,8 @@
 package licenseprecompile
 
 import (
-	"embed"
+	"bytes"
+	_ "embed"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -11,8 +12,8 @@ import (
 	cmn "github.com/cosmos/evm/precompiles/common"
 
 	"cosmossdk.io/core/address"
-	"cosmossdk.io/log"
-	storetypes "cosmossdk.io/store/types"
+	"cosmossdk.io/log/v2"
+	storetypes "github.com/cosmos/cosmos-sdk/store/v2/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -23,14 +24,16 @@ import (
 var _ vm.PrecompiledContract = &Precompile{}
 
 var (
+	// Embed abi json file to the executable binary. Needed when importing as dependency.
+	//
 	//go:embed abi.json
-	f   embed.FS
+	f   []byte
 	ABI abi.ABI
 )
 
 func init() {
 	var err error
-	ABI, err = cmn.LoadABI(f, "abi.json")
+	ABI, err = abi.JSON(bytes.NewReader(f))
 	if err != nil {
 		panic(err)
 	}
@@ -67,6 +70,12 @@ func NewPrecompile(
 		queryServer: licensekeeper.NewQuerier(keeper),
 		addrCdc:     addrCdc,
 	}
+}
+
+// Name returns the human-readable identifier of the precompile, required by
+// geth 1.17's vm.PrecompiledContract interface.
+func (p Precompile) Name() string {
+	return "license"
 }
 
 // RequiredGas returns the minimum gas required to execute the precompile call.

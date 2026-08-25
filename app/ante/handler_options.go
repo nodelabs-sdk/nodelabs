@@ -2,8 +2,8 @@ package ante
 
 import (
 	errorsmod "cosmossdk.io/errors"
-	storetypes "cosmossdk.io/store/types"
-	txsigning "cosmossdk.io/x/tx/signing"
+	storetypes "github.com/cosmos/cosmos-sdk/store/v2/types"
+	txsigning "github.com/cosmos/cosmos-sdk/x/tx/signing"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -16,7 +16,7 @@ import (
 	evmante "github.com/cosmos/evm/ante"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 
-	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	ibckeeper "github.com/cosmos/ibc-go/v11/modules/core/keeper"
 
 	networkante "github.com/nodelabs-sdk/nodelabs/x/network/ante"
 	networkkeeper "github.com/nodelabs-sdk/nodelabs/x/network/keeper"
