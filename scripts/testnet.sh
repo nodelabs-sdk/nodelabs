@@ -105,6 +105,12 @@ if [[ "$overwrite" == "y" || "$overwrite" == "Y" ]]; then
   # Set mint denom
   jq '.app_state["mint"]["params"]["mint_denom"]="'"$DENOM"'"' "$GENESIS" > "$TMP_GENESIS" && mv "$TMP_GENESIS" "$GENESIS"
 
+  # Seed the genesis base fee to $BASEFEE. Without this the feemarket default
+  # (1 gwei) applies and low-priced txs are silently excluded from proposals
+  # until the base fee decays below their gas price (~90 empty blocks) —
+  # CheckTx accepts them, proposal verification drops them.
+  jq '.app_state["feemarket"]["params"]["base_fee"]="'"$BASEFEE"'.000000000000000000"' "$GENESIS" > "$TMP_GENESIS" && mv "$TMP_GENESIS" "$GENESIS"
+
   # Bank denom metadata
   jq '.app_state["bank"]["denom_metadata"]=[{
     "description": "The native token of the Nodelabs chain.",
