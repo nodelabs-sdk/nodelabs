@@ -54,6 +54,7 @@ func (app *NodelabsApp) configureEVMMempool(appOpts servertypes.AppOptions, logg
 		),
 	)
 	app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
+	app.SetProcessProposal(abciProposalHandler.ProcessProposalHandler())
 
 	return nil
 }
