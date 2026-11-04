@@ -74,10 +74,22 @@ func TestGenesisRoundTripActiveIndex(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []uint64{resp.Ids[2]}, revResp.Ids)
 
+	// Issue counted 3 into the holder's active count, revoke took one out.
+	count, err := src.Keeper.CountActiveLicenses(srcCtx, holder, []string{"node"}, 0)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), count)
+	require.NoError(t, src.Keeper.CheckInvariants(srcCtx))
+
 	exported := src.Keeper.ExportGenesis(srcCtx)
 
 	dst, dstCtx := keepertest.LicenseKeeper(t)
 	require.NoError(t, dst.InitGenesis(dstCtx, exported))
+
+	// The count is rebuilt on import, from active licenses only.
+	count, err = dst.CountActiveLicenses(dstCtx, holder, []string{"node"}, 0)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), count)
+	require.NoError(t, dst.CheckInvariants(dstCtx))
 
 	// The holder index is rebuilt for active licenses only.
 	q := setupQuerier(dst)

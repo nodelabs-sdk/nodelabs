@@ -176,7 +176,7 @@ func (ms msgServer) DeauthorizeActivationKey(ctx context.Context, msg *types.Msg
 // node's original activation key — only while that key is still active, so
 // deauthorizing a provider fully revokes its power over already-activated
 // nodes — or the node itself. Deactivation is irreversible and deliberately
-// does not touch last_active_time or the recent-activity index: deactivated
+// does not touch last_active_time or the recent-activity window: deactivated
 // nodes keep counting in the recent window.
 func (ms msgServer) DeactivateNode(ctx context.Context, msg *types.MsgDeactivateNode) (*types.MsgDeactivateNodeResponse, error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)

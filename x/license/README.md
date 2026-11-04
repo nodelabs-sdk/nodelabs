@@ -155,6 +155,8 @@ Two secondary indexes support the listing queries:
 - `(holder, type, id)` tracks **active** licenses only — written on issue,
   removed on revoke. A license's holder never changes, so no entry is ever
   moved. This powers the holder queries and the revoke-most-recent-first walk.
+  Alongside it, a per-(holder, type) count of the same entries is kept in step,
+  so counting a holder's active licenses is one read.
 
 The next-id sequence is a single chain-wide counter and is its own piece of
 state (exported in genesis as `next_license_id`), independent of the
@@ -346,9 +348,10 @@ Other modules read license state through a narrow surface rather than the
 records themselves:
 
 ```go
-// Bounded count of a holder's active licenses across license types.
-// stopAt != 0 stops the walk once the count is decisive; 0 counts everything.
-count, err := k.CountActiveLicenses(ctx, holder, []string{"node.license"}, stopAt)
+// Exact count of a holder's active licenses across license types: one read
+// per type, whatever the holdings. stopAt is ignored; it bounded an index walk
+// before the counts existed and is kept so the interface is unchanged.
+count, err := k.CountActiveLicenses(ctx, holder, []string{"node.license"}, 0)
 
 // Existence — the check x/network runs before binding a node type to a type.
 found, err := k.HasLicenseType(ctx, "node.license")
@@ -426,6 +429,7 @@ The module uses the `cosmossdk.io/collections` framework for type-safe state man
 | `NextLicenseID` | (item) | `uint64` (chain-wide next-id sequence, exported in genesis as `next_license_id`) |
 | `LicensesByType` | `(string, uint64)` (type ID, license ID) | (keyset, no value; active and revoked) |
 | `ActiveLicensesByHolder` | `(string, string, uint64)` (holder, type ID, license ID) | (keyset, no value; active licenses only) |
+| `ActiveLicenseCounts` | `(string, string)` (holder, type ID) | `uint64` (entries under that `ActiveLicensesByHolder` prefix; rebuilt on genesis import) |
 | `Params` | (item) | `Params` (module owner) |
 | `Grants` | `(string, string, string)` (grantee, action, scope) | (keyset, no value) |
 
@@ -435,7 +439,10 @@ binary and served by the `actions` query.
 
 ## Module Versioning
 
-The module uses Cosmos SDK's consensus versioning. The current version is `1`. To add a state migration:
+The module uses Cosmos SDK's consensus versioning. The current version is `2`;
+the 1→2 migration backfills `ActiveLicenseCounts` from `ActiveLicensesByHolder`.
+`CheckInvariants` (currently `CheckActiveLicenseCounts`) verifies the two agree.
+To add a state migration:
 
 1. Bump `ConsensusVersion` in `module.go`
 2. Create `keeper/migrator.go` with the migration function

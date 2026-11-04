@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"cosmossdk.io/collections"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
@@ -34,7 +35,7 @@ import (
 func (k Keeper) CheckInvariants(ctx context.Context) error {
 	return errors.Join(
 		k.CheckOperatorNodeCounts(ctx),
-		k.CheckRecentNodeActivity(ctx),
+		k.CheckRecentNodeCounts(ctx),
 	)
 }
 
@@ -104,74 +105,73 @@ func (k Keeper) CheckOperatorNodeCounts(ctx context.Context) error {
 	return nil
 }
 
-// bucket is a node's expected recent-activity coordinates, as a plain
-// comparable value for the same reason tallyKey is.
-type bucket struct {
-	operator string
-	nodeType string
-	epoch    uint64
-}
+// CheckRecentNodeCounts verifies every RecentNodeCounts window against the
+// node records: each (operator, nodeType) window must count exactly the nodes
+// whose last_active_time falls on its today and yesterday. The window total is
+// an activation-limit comparand, so an overcount wrongly refuses activations
+// and an undercount wrongly admits them. Deactivated nodes are included:
+// deactivation deliberately leaves them counted until their day ages out.
+//
+// Each window is judged as of the later of the current block day and its own
+// stored day, so a check run with an earlier context than the last write
+// (possible in tests and queries, never in block execution) compares like
+// with like.
+func (k Keeper) CheckRecentNodeCounts(ctx context.Context) error {
+	blockDay := types.DayEpoch(sdk.UnwrapSDKContext(ctx).BlockTime())
 
-// CheckRecentNodeActivity verifies the index holds exactly one entry per node,
-// in the day bucket of that node's last_active_time. The count over this index
-// is an activation-limit comparand, so a duplicate entry inflates an operator's
-// recent-activity figure and a missing one deflates it — and because
-// deactivation deliberately leaves entries in place, "one per node" must hold
-// for deactivated nodes too.
-func (k Keeper) CheckRecentNodeActivity(ctx context.Context) error {
-	want := make(map[string]bucket)
-	if err := k.Nodes.Walk(ctx, nil, func(addr string, node types.Node) (bool, error) {
-		want[addr] = bucket{
-			operator: node.Operator,
-			nodeType: node.Type,
-			epoch:    types.DayEpoch(node.LastActiveTime),
+	// Node count per (operator, nodeType) per day of last activity.
+	byDay := make(map[tallyKey]map[uint64]uint64)
+	if err := k.Nodes.Walk(ctx, nil, func(_ string, node types.Node) (bool, error) {
+		tk := tallyKey{operator: node.Operator, nodeType: node.Type}
+		if byDay[tk] == nil {
+			byDay[tk] = make(map[uint64]uint64)
 		}
+		byDay[tk][types.DayEpoch(node.LastActiveTime)]++
 		return false, nil
 	}); err != nil {
-		return fmt.Errorf("recent node activity: walking nodes: %w", err)
+		return fmt.Errorf("recent node counts: walking nodes: %w", err)
 	}
 
 	var problems []string
-	seen := make(map[string]int, len(want))
-
-	if err := k.RecentNodeActivity.Walk(ctx, nil, func(key collections.Quad[string, string, uint64, string]) (bool, error) {
-		addr := key.K4()
-		seen[addr]++
-
-		got := bucket{operator: key.K1(), nodeType: key.K2(), epoch: key.K3()}
-		exp, known := want[addr]
-		switch {
-		case !known:
+	seen := make(map[tallyKey]bool)
+	if err := k.RecentNodeCounts.Walk(ctx, nil, func(key collections.Pair[string, string], stored types.RecentNodeWindow) (bool, error) {
+		tk := tallyKey{operator: key.K1(), nodeType: key.K2()}
+		seen[tk] = true
+		day := blockDay
+		if stored.Epoch > day {
+			day = stored.Epoch
+		}
+		got := rollWindow(stored, day)
+		expToday, expYesterday := byDay[tk][day], byDay[tk][day-1]
+		if got.Today != expToday || got.Yesterday != expYesterday {
 			problems = append(problems, fmt.Sprintf(
-				"\t%s: index entry for a node that does not exist (operator %s, type %s, day %d)\n",
-				addr, got.operator, got.nodeType, got.epoch))
-		case got != exp:
-			problems = append(problems, fmt.Sprintf(
-				"\t%s: indexed at (operator %s, type %s, day %d), record says (operator %s, type %s, day %d)\n",
-				addr, got.operator, got.nodeType, got.epoch, exp.operator, exp.nodeType, exp.epoch))
+				"\t%s: window on day %d has (today %d, yesterday %d), node records give (today %d, yesterday %d)\n",
+				tk, day, got.Today, got.Yesterday, expToday, expYesterday))
 		}
 		return false, nil
 	}); err != nil {
-		return fmt.Errorf("recent node activity: walking index: %w", err)
+		return fmt.Errorf("recent node counts: walking windows: %w", err)
 	}
 
-	// Map iteration is unordered, so these are sorted before formatting.
-	addrs := make([]string, 0, len(want))
-	for addr := range want {
-		addrs = append(addrs, addr)
-	}
-	sort.Strings(addrs)
-	for _, addr := range addrs {
-		switch n := seen[addr]; {
-		case n == 0:
-			problems = append(problems, fmt.Sprintf("\t%s: node has no index entry\n", addr))
-		case n > 1:
-			problems = append(problems, fmt.Sprintf("\t%s: node has %d index entries, want exactly 1\n", addr, n))
+	// A pair with no window must have no node counted in it. Map iteration is
+	// unordered, so these are sorted before formatting.
+	var missing []string
+	for tk, days := range byDay {
+		if seen[tk] {
+			continue
+		}
+		for d, n := range days {
+			if d+1 >= blockDay {
+				missing = append(missing, fmt.Sprintf(
+					"\t%s: no window, but %d node(s) were last active on day %d\n", tk, n, d))
+			}
 		}
 	}
+	sort.Strings(missing)
+	problems = append(problems, missing...)
 
 	if len(problems) > 0 {
-		return fmt.Errorf("recent node activity: %d index problem(s):\n%s", len(problems), strings.Join(problems, ""))
+		return fmt.Errorf("recent node counts: %d window problem(s):\n%s", len(problems), strings.Join(problems, ""))
 	}
 	return nil
 }

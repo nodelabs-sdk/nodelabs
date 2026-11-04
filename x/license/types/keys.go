@@ -80,4 +80,5 @@ var (
 	// Index prefixes
 	ActiveLicensesByHolderPrefix = collections.NewPrefix(10)
 	LicensesByTypePrefix         = collections.NewPrefix(11)
+	ActiveLicenseCountsPrefix    = collections.NewPrefix(12)
 )

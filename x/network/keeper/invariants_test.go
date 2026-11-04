@@ -105,59 +105,69 @@ func TestOperatorNodeCountsInvariantDetectsDrift(t *testing.T) {
 	require.ErrorContains(t, err, "no stored tally")
 }
 
-// TestRecentNodeActivityInvariantDetectsDrift covers the three ways the
-// one-entry-per-node invariant can break, each of which skews the
-// recent-activity comparand the activation limit reads.
-func TestRecentNodeActivityInvariantDetectsDrift(t *testing.T) {
+// TestRecentNodeCountsInvariantDetectsDrift covers the ways a window can
+// disagree with the node records, each of which skews the recent-activity
+// comparand the activation limit reads.
+func TestRecentNodeCountsInvariantDetectsDrift(t *testing.T) {
 	f, operator := seedFleet(t)
-	check := f.Keeper.CheckRecentNodeActivity
+	check := f.Keeper.CheckRecentNodeCounts
+	key := collections.Join(operator, f.NodeType)
 
-	// Pick a node and its true bucket.
-	var addr string
-	var node types.Node
-	require.NoError(t, f.Keeper.Nodes.Walk(f.Ctx, nil, func(a string, n types.Node) (bool, error) {
-		addr, node = a, n
-		return true, nil
-	}))
-	epoch := types.DayEpoch(node.LastActiveTime)
-	trueKey := collections.Join4(operator, f.NodeType, epoch, addr)
-
-	// 1. A duplicate entry in another day bucket inflates the count.
-	require.NoError(t, f.Keeper.RecentNodeActivity.Set(f.Ctx, collections.Join4(operator, f.NodeType, epoch+1, addr)))
-	err := check(f.Ctx)
-	require.Error(t, err, "a duplicate index entry must be reported")
-	require.ErrorContains(t, err, "2 index entries, want exactly 1")
-
-	require.NoError(t, f.Keeper.RecentNodeActivity.Remove(f.Ctx, collections.Join4(operator, f.NodeType, epoch+1, addr)))
-	err = check(f.Ctx)
+	// seedFleet leaves the window on day0+1: nodeA today, the other two
+	// (one deactivated) yesterday.
+	later := f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(24 * time.Hour))
+	require.NoError(t, check(later))
+	good, err := f.Keeper.RecentNodeCounts.Get(f.Ctx, key)
 	require.NoError(t, err)
+	require.Equal(t, uint64(1), good.Today)
+	require.Equal(t, uint64(2), good.Yesterday)
 
-	// 2. A missing entry deflates it.
-	require.NoError(t, f.Keeper.RecentNodeActivity.Remove(f.Ctx, trueKey))
-	err = check(f.Ctx)
-	require.Error(t, err, "a missing index entry must be reported")
-	require.ErrorContains(t, err, "no index entry")
+	// 1. An overcount inflates the comparand.
+	bad := good
+	bad.Today++
+	require.NoError(t, f.Keeper.RecentNodeCounts.Set(f.Ctx, key, bad))
+	err = check(later)
+	require.Error(t, err, "an overcount must be reported")
+	require.ErrorContains(t, err, "window on day")
 
-	// 3. An entry in the wrong bucket: present and unique, but stale — the
-	// failure a TouchNodeActivity that moved one key and not the other leaves.
-	require.NoError(t, f.Keeper.RecentNodeActivity.Set(f.Ctx, collections.Join4(operator, f.NodeType, epoch-5, addr)))
-	err = check(f.Ctx)
-	require.Error(t, err, "an entry in the wrong day bucket must be reported")
-	require.ErrorContains(t, err, "record says")
+	// 2. An undercount deflates it.
+	bad = good
+	bad.Yesterday--
+	require.NoError(t, f.Keeper.RecentNodeCounts.Set(f.Ctx, key, bad))
+	require.Error(t, check(later), "an undercount must be reported")
+
+	// 3. A stale day: right counts, wrong epoch, so the roll lands them in
+	// the wrong slots.
+	bad = good
+	bad.Epoch--
+	require.NoError(t, f.Keeper.RecentNodeCounts.Set(f.Ctx, key, bad))
+	require.Error(t, check(later), "a window on the wrong day must be reported")
+
+	// 4. A missing window for a pair with recent nodes.
+	require.NoError(t, f.Keeper.RecentNodeCounts.Remove(f.Ctx, key))
+	err = check(later)
+	require.Error(t, err, "a missing window must be reported")
+	require.ErrorContains(t, err, "no window")
+
+	// Restored, it passes again; and once every node has aged out, no window
+	// at all is also consistent.
+	require.NoError(t, f.Keeper.RecentNodeCounts.Set(f.Ctx, key, good))
+	require.NoError(t, check(later))
+	require.NoError(t, f.Keeper.RecentNodeCounts.Remove(f.Ctx, key))
+	require.NoError(t, check(f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(72*time.Hour))))
 }
 
-// TestRecentNodeActivityInvariantDetectsOrphanEntry: an index entry naming a
-// node that no longer exists. Node records are never removed, so this cannot
-// arise from the handlers — the invariant covers it because the index is
-// rebuilt from genesis, where the two can be supplied independently.
-func TestRecentNodeActivityInvariantDetectsOrphanEntry(t *testing.T) {
-	f, operator := seedFleet(t)
+// TestRecentNodeCountsInvariantDetectsOrphanWindow: a window counting nodes
+// for a pair that has none. The handlers cannot produce this; the invariant
+// covers it because the windows are derived state.
+func TestRecentNodeCountsInvariantDetectsOrphanWindow(t *testing.T) {
+	f, _ := seedFleet(t)
 
 	ghost := sample.AccAddress()
-	require.NoError(t, f.Keeper.RecentNodeActivity.Set(f.Ctx,
-		collections.Join4(operator, f.NodeType, types.DayEpoch(keepertest.NetworkFixtureBlockTime), ghost)))
+	require.NoError(t, f.Keeper.RecentNodeCounts.Set(f.Ctx, collections.Join(ghost, f.NodeType),
+		types.RecentNodeWindow{Epoch: types.DayEpoch(keepertest.NetworkFixtureBlockTime), Today: 1}))
 
-	err := f.Keeper.CheckRecentNodeActivity(f.Ctx)
+	err := f.Keeper.CheckRecentNodeCounts(f.Ctx)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "index entry for a node that does not exist")
+	require.ErrorContains(t, err, ghost)
 }

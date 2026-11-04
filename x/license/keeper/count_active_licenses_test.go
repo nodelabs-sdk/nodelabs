@@ -3,6 +3,8 @@ package keeper_test
 import (
 	"testing"
 
+	"cosmossdk.io/collections"
+
 	"github.com/stretchr/testify/require"
 
 	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
@@ -33,22 +35,20 @@ func TestCountActiveLicenses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(5), count)
 
-	// stopAt caps the walk.
-	count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, counted, 1)
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), count)
+	// stopAt is ignored: the exact count comes back whatever it is.
+	for _, stopAt := range []uint64{1, 4, 100} {
+		count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, counted, stopAt)
+		require.NoError(t, err)
+		require.Equal(t, uint64(5), count, "stopAt %d", stopAt)
+	}
 
-	count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, counted, 4)
-	require.NoError(t, err)
-	require.Equal(t, uint64(4), count)
-
-	// A stopAt above the holdings returns the true count.
-	count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, counted, 100)
-	require.NoError(t, err)
-	require.Equal(t, uint64(5), count)
-
-	// No counted types means zero without walking.
+	// No counted types means zero.
 	count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, nil, 0)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), count)
+
+	// A holder with none of a type counts zero.
+	count, err = f.Keeper.CountActiveLicenses(f.Ctx, other, []string{"type.b"}, 0)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), count)
 
@@ -67,4 +67,18 @@ func TestCountActiveLicenses(t *testing.T) {
 	count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, counted, 0)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), count)
+
+	// Revoking every license of a type removes its count entry entirely.
+	_, err = msgServer.RevokeLicenses(f.Ctx, &types.MsgRevokeLicenses{
+		Revoker:       other,
+		LicenseTypeId: "type.a",
+		LicenseIds:    []uint64{types.FirstLicenseID + 2},
+	})
+	require.NoError(t, err)
+	has, err := f.Keeper.ActiveLicenseCounts.Has(f.Ctx, collections.Join(holder, "type.a"))
+	require.NoError(t, err)
+	require.False(t, has)
+	count, err = f.Keeper.CountActiveLicenses(f.Ctx, holder, counted, 0)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), count)
 }
