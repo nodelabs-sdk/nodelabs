@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -13,17 +14,28 @@ import (
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 
-// recentEntries returns every RecentNodeActivity entry for an operator as
-// nodeAddress -> dayEpoch, across all node types and day buckets.
-func recentEntries(t testing.TB, f *keepertest.NetworkFixture, operator string) map[string]uint64 {
+// recentWindow returns the stored RecentNodeCounts window for
+// (operator, nodeType), or the zero window when there is none.
+func recentWindow(t testing.TB, f *keepertest.NetworkFixture, operator, nodeType string) types.RecentNodeWindow {
 	t.Helper()
-	entries := make(map[string]uint64)
-	rng := collections.NewPrefixedQuadRange[string, string, uint64, string](operator)
-	require.NoError(t, f.Keeper.RecentNodeActivity.Walk(f.Ctx, rng, func(key collections.Quad[string, string, uint64, string]) (bool, error) {
-		entries[key.K4()] = key.K3()
+	w, err := f.Keeper.RecentNodeCounts.Get(f.Ctx, collections.Join(operator, nodeType))
+	if errors.Is(err, collections.ErrNotFound) {
+		return types.RecentNodeWindow{}
+	}
+	require.NoError(t, err)
+	return w
+}
+
+// operatorNodes returns every node address the operator has activated.
+func operatorNodes(t testing.TB, f *keepertest.NetworkFixture, operator string) []string {
+	t.Helper()
+	var addrs []string
+	rng := collections.NewPrefixedPairRange[string, string](operator)
+	require.NoError(t, f.Keeper.OperatorNodes.Walk(f.Ctx, rng, func(key collections.Pair[string, string]) (bool, error) {
+		addrs = append(addrs, key.K2())
 		return false, nil
 	}))
-	return entries
+	return addrs
 }
 
 // ---------------------------------------------------------------------------
@@ -174,12 +186,7 @@ func TestActivateNodeLimitBoundary(t *testing.T) {
 	require.ErrorContains(t, err, "(3)")
 
 	// Deactivating one frees an active slot.
-	nodes := recentEntries(t, f, operator)
-	var anyNode string
-	for node := range nodes {
-		anyNode = node
-		break
-	}
+	anyNode := operatorNodes(t, f, operator)[0]
 	_, err = ms.DeactivateNode(f.Ctx, &types.MsgDeactivateNode{Signer: operator, NodeAddress: anyNode})
 	require.NoError(t, err)
 	activateNode(t, f, ms, f.Ctx, key, operator)
@@ -327,48 +334,63 @@ func TestActivateNodeTypeRestriction(t *testing.T) {
 // Index-maintenance invariants
 // ---------------------------------------------------------------------------
 
-// TestRecentActivityInvariants pins the index contract: exactly one
-// RecentNodeActivity entry per node at all times; activation seeds it,
-// TouchNodeActivity moves it between day buckets, and deactivation retains
-// it (deactivated nodes keep counting in the recent window).
+// TestRecentActivityInvariants pins the window contract: activation counts a
+// node into today, a same-day touch changes nothing, a later-day touch moves
+// it into the new today (taking it out of yesterday when it was there), and
+// deactivation leaves it counted.
 func TestRecentActivityInvariants(t *testing.T) {
 	f, ms := setup(t)
 	operator := sample.AccAddress()
-	f.IssueLicenses(t, operator, 1)
+	f.IssueLicenses(t, operator, 2)
 	key := authorizeKey(t, f, ms, f.Ctx, operator)
 	node := activateNode(t, f, ms, f.Ctx, key, operator)
+	other := activateNode(t, f, ms, f.Ctx, key, operator)
 
 	day0 := types.DayEpoch(keepertest.NetworkFixtureBlockTime)
+	window := func() types.RecentNodeWindow { return recentWindow(t, f, operator, f.NodeType) }
 
-	// Activation seeds exactly one entry in today's bucket.
-	entries := recentEntries(t, f, operator)
-	require.Equal(t, map[string]uint64{node: day0}, entries)
+	// Activation counts both nodes into today.
+	require.Equal(t, types.RecentNodeWindow{Epoch: day0, Today: 2}, window())
 
-	// A same-day touch keeps the single entry in place.
+	// A same-day touch changes nothing.
 	require.NoError(t, f.Keeper.TouchNodeActivity(f.Ctx, node))
-	require.Equal(t, map[string]uint64{node: day0}, recentEntries(t, f, operator))
+	require.Equal(t, types.RecentNodeWindow{Epoch: day0, Today: 2}, window())
+	require.NoError(t, f.Keeper.CheckRecentNodeCounts(f.Ctx))
 
-	// A touch on a later day moves the entry — never duplicates it.
-	later := f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(48 * time.Hour))
-	require.NoError(t, f.Keeper.TouchNodeActivity(later, node))
-	require.Equal(t, map[string]uint64{node: day0 + 2}, recentEntries(t, f, operator))
+	// A next-day touch rolls the window and moves the node out of yesterday
+	// into today; the untouched node stays in yesterday.
+	day1 := f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(24 * time.Hour))
+	require.NoError(t, f.Keeper.TouchNodeActivity(day1, node))
+	require.Equal(t, types.RecentNodeWindow{Epoch: day0 + 1, Today: 1, Yesterday: 1}, window())
+	require.NoError(t, f.Keeper.CheckRecentNodeCounts(day1))
 
-	rec, err := f.Keeper.Nodes.Get(f.Ctx, node)
-	require.NoError(t, err)
-	require.Equal(t, later.BlockTime().Unix(), rec.LastActiveTime.Unix())
+	// A touch after a gap of two days: the node was in neither slot of the
+	// rolled window, so it is only added.
+	day3 := f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(72 * time.Hour))
+	require.NoError(t, f.Keeper.TouchNodeActivity(day3, other))
+	require.Equal(t, types.RecentNodeWindow{Epoch: day0 + 3, Today: 1}, window())
+	require.NoError(t, f.Keeper.CheckRecentNodeCounts(day3))
 
-	// Deactivation touches neither the entry nor last_active_time.
-	evenLater := f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(72 * time.Hour))
-	_, err = ms.DeactivateNode(evenLater, &types.MsgDeactivateNode{Signer: operator, NodeAddress: node})
+	rec, err := f.Keeper.Nodes.Get(f.Ctx, other)
 	require.NoError(t, err)
-	require.Equal(t, map[string]uint64{node: day0 + 2}, recentEntries(t, f, operator))
-	rec, err = f.Keeper.Nodes.Get(f.Ctx, node)
+	require.Equal(t, day3.BlockTime().Unix(), rec.LastActiveTime.Unix())
+
+	// Deactivation touches neither the window nor last_active_time: the node
+	// keeps counting until its day ages out.
+	_, err = ms.DeactivateNode(day3, &types.MsgDeactivateNode{Signer: operator, NodeAddress: other})
 	require.NoError(t, err)
-	require.Equal(t, later.BlockTime().Unix(), rec.LastActiveTime.Unix())
+	require.Equal(t, types.RecentNodeWindow{Epoch: day0 + 3, Today: 1}, window())
+	count, err := f.Keeper.CountRecentActiveNodes(day3, operator, f.NodeType, day3.BlockTime().Add(24*time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), count)
+	rec, err = f.Keeper.Nodes.Get(f.Ctx, other)
+	require.NoError(t, err)
+	require.Equal(t, day3.BlockTime().Unix(), rec.LastActiveTime.Unix())
+	require.NoError(t, f.Keeper.CheckRecentNodeCounts(day3))
 }
 
 // TestRecentCountWindow pins CountRecentActiveNodes to the today+yesterday
-// two-prefix walk.
+// window, rolled forward to the time asked about.
 func TestRecentCountWindow(t *testing.T) {
 	f, ms := setup(t)
 	operator := sample.AccAddress()

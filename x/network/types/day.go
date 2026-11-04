@@ -6,7 +6,7 @@ import "time"
 const secondsPerDay = 24 * 60 * 60
 
 // DayEpoch returns the number of whole UTC days since the Unix epoch for t.
-// It is the day-bucket key used by the recent-activity index and the daily
+// It is the day key used by the recent-activity windows and the daily
 // counters.
 func DayEpoch(t time.Time) uint64 {
 	return uint64(t.Unix() / secondsPerDay)

@@ -63,9 +63,15 @@ var (
 	OperatorNodesPrefix          = collections.NewPrefix(10)
 	OperatorActivationKeysPrefix = collections.NewPrefix(11)
 	OperatorNodeCountsPrefix     = collections.NewPrefix(12)
-	RecentNodeActivityPrefix     = collections.NewPrefix(13)
 	GaslessCountersPrefix        = collections.NewPrefix(14)
 	NodeTypeByLicenseTypePrefix  = collections.NewPrefix(15)
+	RecentNodeCountsPrefix       = collections.NewPrefix(16)
+
+	// LegacyRecentNodeActivityPrefix held the v1 RecentNodeActivity keyset
+	// (operator, nodeType, dayEpoch, nodeAddress), replaced in v2 by
+	// RecentNodeCounts. The v1->v2 migration deletes everything under it. It
+	// stays reserved: never reuse prefix 13.
+	LegacyRecentNodeActivityPrefix = collections.NewPrefix(13)
 )
 
 // Gasless admission counter kinds, the first key of the GaslessCounters map.

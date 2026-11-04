@@ -160,7 +160,7 @@ func (m *GaslessCounter) GetCounter() ActivityCounter {
 
 // GenesisState defines the network module's genesis state. The denormalized
 // structures (operator set, operator-node index, per-operator node counts,
-// and the recent-activity index) are derived from nodes and activation_keys
+// and the recent-activity windows) are derived from nodes and activation_keys
 // on import rather than exported, so they can never disagree with the
 // primary records.
 type GenesisState struct {

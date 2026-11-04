@@ -175,7 +175,7 @@ create within `recent_key_window` (disabled keys included).
 Node addresses are single-use. Records are never removed, so a deactivated
 node's record is exactly what prevents its address from being re-activated.
 Deactivation is irreversible and deliberately does not touch `last_active_time`
-or the recent-activity index — deactivated nodes keep counting in the recent
+or the recent-activity window — deactivated nodes keep counting in the recent
 window, so churning a fleet cannot buy fresh allowance.
 
 The node does not sign its own activation, so delayed activation works by
@@ -211,18 +211,28 @@ count alike:
    fail "recent activation limit exceeded"
 6. Else the currently-active count decides against `limit`
 
-The license walk is bounded by the decision being made rather than by the
-operator's holdings: it stops as soon as the count can no longer change the
-outcome.
+Every quantity is a single denormalized read — the per-(operator, node type)
+tally, the holder's license count from `x/license`, and the recent-activity
+window — so activation costs the same gas at any fleet size. The window is only
+read when step 3 does not decide. Ante admission reads the node type and the
+license count once and uses that count for both the licensed check and the
+per-key daily quota.
 
 Query [`NodeCounts`](#queries) to pre-check an activation without submitting one.
 
 ### Activity and day buckets
 
-Counted activity — activation and status updates — moves a node's single entry
-in the recent-activity index into the current UTC day bucket and stamps
-`last_active_time`. The index holds exactly one entry per node at all times, so
-the "today + yesterday" count is two prefix walks with no dedup.
+Each (operator, node type) has one `RecentNodeWindow`: the UTC day it refers to
+(`epoch`), and how many of its nodes were last active that day (`today`) and the
+day before (`yesterday`). A stored window is rolled forward before use: one day
+later `today` shifts into `yesterday`, two or more days later both are zero.
+
+Counted activity — activation and status updates — stamps `last_active_time`.
+Activation counts the new node into `today`. A node's first status update of a
+UTC day moves it into `today`, taking it out of `yesterday` if it was last
+active the day before; a node last active earlier than that is in neither slot.
+Each node is therefore counted at most once, and the "today + yesterday" count
+is one read.
 
 Daily counters (`ActivityCounter`) reset when the UTC day of the block time
 differs from the UTC day of the counter's `latest_time`. There is no scheduled
@@ -520,8 +530,10 @@ and stateless genesis validation rejects a non-empty one.
 
 Only primary records are exported. The denormalized structures — the operator
 set, the operator indexes, the per-(operator, node type) tallies, the
-recent-activity index, and the node-type-by-license-type map — are **derived on
-import**, so they can never disagree with the records they mirror.
+recent-activity windows, and the node-type-by-license-type map — are **derived on
+import**, so they can never disagree with the records they mirror. Windows are
+built relative to the genesis block time: nodes last active on that UTC day or
+the one before are counted.
 
 `gasless_counters` is exported so an export/import does not hand every signer a
 fresh day's quota.
@@ -576,13 +588,17 @@ Derived structures, rebuilt on genesis import:
 | `OperatorNodes` | `(string, string)` (operator, node address) | (keyset; active and deactivated) |
 | `OperatorActivationKeys` | `(string, string)` (operator, activation address) | (keyset; active and disabled) |
 | `OperatorNodeCounts` | `(string, string)` (operator, node type) | `OperatorNodeCounts{total, active}` |
-| `RecentNodeActivity` | `(string, string, uint64, string)` (operator, node type, day epoch, node address) | (keyset; exactly one entry per node) |
+| `RecentNodeCounts` | `(string, string)` (operator, node type) | `RecentNodeWindow{epoch, today, yesterday}` |
 | `GaslessCounters` | `(string, string, string)` (kind, signer, scope) | `ActivityCounter` |
 | `NodeTypeByLicenseType` | `string` (license type id) | `string` (node type id) |
 
-The node-type dimension on `OperatorNodeCounts` and `RecentNodeActivity` is
+The node-type dimension on `OperatorNodeCounts` and `RecentNodeCounts` is
 load-bearing: activation limits are per node type, so a tally pooled across
 types would let one type's nodes consume another's allowance.
+
+Prefix `0x0d` held the v1 `RecentNodeActivity` index (one key per node), which
+`RecentNodeCounts` replaced in consensus version 2. The v1→v2 migration deletes
+it; the prefix stays reserved.
 
 `NodeTypeByLicenseType` is a map rather than an index because the binding is
 one-to-one — the map shape is what makes a second binding to the same license
@@ -610,7 +626,7 @@ any disagreement:
 | Method | Checks |
 |---|---|
 | `CheckOperatorNodeCounts` | The stored `{total, active}` tally matches the node records, per `(operator, node type)` |
-| `CheckRecentNodeActivity` | The index holds exactly one entry per node, in the day bucket of that node's `last_active_time` |
+| `CheckRecentNodeCounts` | Each recent-activity window counts exactly the nodes whose `last_active_time` falls on its today and yesterday, per `(operator, node type)` |
 | `CheckInvariants` | Both of the above, reporting all problems rather than the first |
 
 ```go
@@ -646,8 +662,10 @@ count, err := k.CountRecentActiveNodes(ctx, operator, nodeType, blockTime)
 ```
 
 `TouchNodeActivity(ctx, nodeAddr)` is the write half: it records counted
-activity for a node, moving its recent-activity entry into the current day
-bucket. Callers are responsible for checking the node is active first.
+activity for a node, moving it into today's slot of its recent-activity window.
+Callers are responsible for checking the node is active first. It is the only
+path that may advance a node's `last_active_time`; writing the field any other
+way desynchronizes the window.
 
 The module in turn consumes narrow interfaces declared in
 `types/expected_keepers.go`: `LicenseKeeper` (`CountActiveLicenses`,
@@ -655,7 +673,9 @@ The module in turn consumes narrow interfaces declared in
 
 ## Module Versioning
 
-The module uses Cosmos SDK's consensus versioning. The current version is `1`.
+The module uses Cosmos SDK's consensus versioning. The current version is `2`;
+the 1→2 migration replaces the `RecentNodeActivity` index with
+`RecentNodeCounts` windows built from the node records.
 To add a state migration:
 
 1. Bump `ConsensusVersion` in `module.go`

@@ -55,15 +55,18 @@ func TestGenesisRoundTrip(t *testing.T) {
 	exported := f.Keeper.ExportGenesis(f.Ctx)
 	require.NoError(t, exported.Validate())
 
-	// Import into a fresh fixture.
+	// Import into a fresh fixture, at the export's block day: recent-activity
+	// windows are rebuilt relative to the genesis block time.
 	g, _ := setup(t)
-	require.NoError(t, g.Keeper.InitGenesis(g.Ctx, exported))
+	gLater := g.WithBlockTime(later.BlockTime())
+	require.NoError(t, g.Keeper.InitGenesis(gLater, exported))
 
 	// The re-export must match.
 	require.Equal(t, exported, g.Keeper.ExportGenesis(g.Ctx))
 
 	// Derived structures are rebuilt: operator registration, node counts,
-	// and one recent-activity entry per node in its last-active bucket.
+	// and the recent-activity window: nodeA was last active today, nodeB
+	// yesterday.
 	registered, err := g.Keeper.Operators.Has(g.Ctx, operator)
 	require.NoError(t, err)
 	require.True(t, registered)
@@ -74,7 +77,8 @@ func TestGenesisRoundTrip(t *testing.T) {
 	require.Equal(t, uint64(1), counts.Active)
 
 	day0 := types.DayEpoch(keepertest.NetworkFixtureBlockTime)
-	require.Equal(t, map[string]uint64{nodeA: day0 + 1, nodeB: day0}, recentEntries(t, g, operator))
+	require.Equal(t, types.RecentNodeWindow{Epoch: day0 + 1, Today: 1, Yesterday: 1}, recentWindow(t, g, operator, g.NodeType))
+	require.NoError(t, g.Keeper.CheckInvariants(gLater))
 
 	// The activate counter lands under its node-type scope rather than pooled,
 	// and the unscoped kinds keep the empty scope. The re-export comparison

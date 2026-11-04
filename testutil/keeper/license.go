@@ -138,7 +138,7 @@ func SeedActiveLicenses(t testing.TB, k keeper.Keeper, ctx sdk.Context, holder, 
 			Status:    types.StatusActive,
 		}))
 		require.NoError(t, k.LicensesByType.Set(ctx, collections.Join(typeID, id)))
-		require.NoError(t, k.ActiveLicensesByHolder.Set(ctx, collections.Join3(holder, typeID, id)))
+		require.NoError(t, k.AddActiveLicense(ctx, holder, typeID, id))
 		lt.IssuedCount = lt.IssuedCount.AddRaw(1)
 		lt.ActiveCount = lt.ActiveCount.AddRaw(1)
 	}

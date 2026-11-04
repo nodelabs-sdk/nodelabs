@@ -211,7 +211,7 @@ func (ms msgServer) IssueLicenses(ctx context.Context, msg *types.MsgIssueLicens
 			if err := ms.k.LicensesByType.Set(ctx, collections.Join(entry.LicenseTypeId, id)); err != nil {
 				return nil, err
 			}
-			if err := ms.k.ActiveLicensesByHolder.Set(ctx, collections.Join3(entry.Holder, entry.LicenseTypeId, id)); err != nil {
+			if err := ms.k.AddActiveLicense(ctx, entry.Holder, entry.LicenseTypeId, id); err != nil {
 				return nil, err
 			}
 
@@ -296,7 +296,7 @@ func (ms msgServer) RevokeLicenses(ctx context.Context, msg *types.MsgRevokeLice
 		if err := ms.k.Licenses.Set(ctx, license.Id, license); err != nil {
 			return nil, err
 		}
-		if err := ms.k.ActiveLicensesByHolder.Remove(ctx, collections.Join3(license.Holder, license.Type, license.Id)); err != nil {
+		if err := ms.k.removeActiveLicense(ctx, license.Holder, license.Type, license.Id); err != nil {
 			return nil, err
 		}
 

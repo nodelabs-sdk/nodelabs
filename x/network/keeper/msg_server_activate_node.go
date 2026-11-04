@@ -64,38 +64,19 @@ func (ms msgServer) ActivateNode(ctx context.Context, msg *types.MsgActivateNode
 		return nil, errorsmod.Wrapf(types.ErrNodeExists, "node %s", msg.NodeAddress)
 	}
 
-	// Gather the comparands first so the license walk can stop as soon as
-	// the count is decisive: every check compares a multiplier x count
-	// product against one of these, so counts beyond
-	// max(comparands)/activation_limit_multiplier + 1 cannot change any
-	// outcome (spam_limit_multiplier >= activation_limit_multiplier makes
-	// the spam check decisive even earlier).
-	//
 	// Every quantity here is scoped to this node type — the tallies, the
 	// activity window, and the license count alike. Mixing scopes would let an
-	// operator's nodes of one type consume another type's allowance.
+	// operator's nodes of one type consume another type's allowance. Each is a
+	// single denormalized read, so the check costs the same at any fleet size.
 	counts, err := ms.k.GetOperatorNodeCounts(ctx, msg.Operator, msg.NodeType)
 	if err != nil {
 		return nil, err
 	}
-	recent, err := ms.k.CountRecentActiveNodes(ctx, msg.Operator, msg.NodeType, sdkCtx.BlockTime())
-	if err != nil {
-		return nil, err
-	}
-
-	maxComparand := counts.Total
-	if counts.Active > maxComparand {
-		maxComparand = counts.Active
-	}
-	if recent > maxComparand {
-		maxComparand = recent
-	}
-	stopAt := maxComparand/params.ActivationLimitMultiplier + 1
 
 	// Step 2 — license count and activation limit. Only licenses of the type
 	// bound to this node type count; a node type is entitled by its own
 	// license type and nothing else.
-	count, err := ms.k.licenseKeeper.CountActiveLicenses(ctx, msg.Operator, []string{nodeType.LicenseTypeId}, stopAt)
+	count, err := ms.k.licenseKeeper.CountActiveLicenses(ctx, msg.Operator, []string{nodeType.LicenseTypeId}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -106,24 +87,26 @@ func (ms msgServer) ActivateNode(ctx context.Context, msg *types.MsgActivateNode
 	}
 	limit := params.ActivationLimitMultiplier * count
 
-	// Steps 3-6.
-	switch {
-	case counts.Total < limit:
-		// allow
-	case recent < limit:
-		// allow
-	default:
-		spamLimit := params.SpamLimitMultiplier * count
-		if recent >= spamLimit {
-			return nil, errorsmod.Wrapf(types.ErrRecentActivationLimit, "recent activation limit exceeded (%d)", spamLimit)
+	// Steps 3-6, in spec order: the recent-activity window is only read when
+	// the lifetime total no longer decides.
+	if counts.Total >= limit {
+		recent, err := ms.k.CountRecentActiveNodes(ctx, msg.Operator, msg.NodeType, sdkCtx.BlockTime())
+		if err != nil {
+			return nil, err
 		}
-		if counts.Active >= limit {
-			return nil, errorsmod.Wrapf(types.ErrActivationLimit, "activation limit exceeded (%d)", limit)
+		if recent >= limit {
+			spamLimit := params.SpamLimitMultiplier * count
+			if recent >= spamLimit {
+				return nil, errorsmod.Wrapf(types.ErrRecentActivationLimit, "recent activation limit exceeded (%d)", spamLimit)
+			}
+			if counts.Active >= limit {
+				return nil, errorsmod.Wrapf(types.ErrActivationLimit, "activation limit exceeded (%d)", limit)
+			}
 		}
 	}
 
-	// Admitted: write the node, seed its recent-activity entry, and bump the
-	// denormalized counts.
+	// Admitted: write the node, count it into today's recent-activity window,
+	// and bump the denormalized counts.
 	node := types.Node{
 		Address:        msg.NodeAddress,
 		Operator:       msg.Operator,
@@ -138,7 +121,7 @@ func (ms msgServer) ActivateNode(ctx context.Context, msg *types.MsgActivateNode
 	if err := ms.k.OperatorNodes.Set(ctx, collections.Join(msg.Operator, msg.NodeAddress)); err != nil {
 		return nil, err
 	}
-	if err := ms.k.RecentNodeActivity.Set(ctx, collections.Join4(msg.Operator, msg.NodeType, types.DayEpoch(sdkCtx.BlockTime()), msg.NodeAddress)); err != nil {
+	if err := ms.k.moveRecent(ctx, msg.Operator, msg.NodeType, nil, types.DayEpoch(sdkCtx.BlockTime())); err != nil {
 		return nil, err
 	}
 	counts.Total++

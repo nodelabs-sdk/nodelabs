@@ -205,8 +205,6 @@ func (q Querier) NodeCounts(ctx context.Context, req *types.QueryNodeCountsReque
 		if err != nil {
 			return types.NodeTypeCounts{}, err
 		}
-		// stopAt 0: a query, so the full count is wanted rather than the
-		// decision-bounded walk the handlers use.
 		licenses, err := q.Keeper.licenseKeeper.CountActiveLicenses(ctx, req.Operator, []string{nt.LicenseTypeId}, 0)
 		if err != nil {
 			return types.NodeTypeCounts{}, err

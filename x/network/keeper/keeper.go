@@ -17,8 +17,9 @@ import (
 )
 
 type Keeper struct {
-	cdc    codec.BinaryCodec
-	logger log.Logger
+	cdc          codec.BinaryCodec
+	logger       log.Logger
+	storeService storetypes.KVStoreService
 
 	// state management
 	Schema collections.Schema
@@ -62,13 +63,15 @@ type Keeper struct {
 	// another's allowance.
 	OperatorNodeCounts collections.Map[collections.Pair[string, string], types.OperatorNodeCounts]
 
-	// RecentNodeActivity indexes (operator, nodeType, dayEpoch, nodeAddress)
-	// with exactly one entry per node at all times: seeded by ActivateNode and
-	// moved between day buckets by TouchNodeActivity. Deactivation does not
-	// touch it. The two-prefix (today/yesterday) count over it is the
-	// activation algorithm's RecentActiveNodeCount, which is per node type for
-	// the same reason OperatorNodeCounts is.
-	RecentNodeActivity collections.KeySet[collections.Quad[string, string, uint64, string]]
+	// RecentNodeCounts is the activation algorithm's RecentActiveNodeCount,
+	// denormalized per (operator, nodeType) as a rolling two-day window: how
+	// many nodes had their most recent counted activity today and yesterday
+	// (UTC). ActivateNode counts a new node into today; TouchNodeActivity moves
+	// a node into today on its first counted activity of a day. Deactivation
+	// does not touch it, so a deactivated node keeps counting until its day
+	// ages out. Reads are one Get regardless of fleet size; it is per node type
+	// for the same reason OperatorNodeCounts is.
+	RecentNodeCounts collections.Map[collections.Pair[string, string], types.RecentNodeWindow]
 
 	// GaslessCounters holds the remaining ante-admission daily counters,
 	// keyed (kind, signer, scope): authorize per operator, activate per
@@ -119,8 +122,9 @@ func NewKeeper(
 	}
 
 	k := Keeper{
-		cdc:    cdc,
-		logger: logger,
+		cdc:          cdc,
+		logger:       logger,
+		storeService: storeService,
 
 		Params:             collections.NewItem(sb, types.ParamsPrefix, "params", codec.CollValue[types.Params](cdc)),
 		Nodes:              collections.NewMap(sb, types.NodesPrefix, "nodes", collections.StringKey, codec.CollValue[types.Node](cdc)),
@@ -132,7 +136,7 @@ func NewKeeper(
 		OperatorNodes:          collections.NewKeySet(sb, types.OperatorNodesPrefix, "operator_nodes", collections.PairKeyCodec(collections.StringKey, collections.StringKey)),
 		OperatorActivationKeys: collections.NewKeySet(sb, types.OperatorActivationKeysPrefix, "operator_activation_keys", collections.PairKeyCodec(collections.StringKey, collections.StringKey)),
 		OperatorNodeCounts:     collections.NewMap(sb, types.OperatorNodeCountsPrefix, "operator_node_counts", collections.PairKeyCodec(collections.StringKey, collections.StringKey), codec.CollValue[types.OperatorNodeCounts](cdc)),
-		RecentNodeActivity:     collections.NewKeySet(sb, types.RecentNodeActivityPrefix, "recent_node_activity", collections.QuadKeyCodec(collections.StringKey, collections.StringKey, collections.Uint64Key, collections.StringKey)),
+		RecentNodeCounts:       collections.NewMap(sb, types.RecentNodeCountsPrefix, "recent_node_counts", collections.PairKeyCodec(collections.StringKey, collections.StringKey), codec.CollValue[types.RecentNodeWindow](cdc)),
 		GaslessCounters:        collections.NewMap(sb, types.GaslessCountersPrefix, "gasless_counters", collections.TripleKeyCodec(collections.StringKey, collections.StringKey, collections.StringKey), codec.CollValue[types.ActivityCounter](cdc)),
 		NodeTypeByLicenseType:  collections.NewMap(sb, types.NodeTypeByLicenseTypePrefix, "node_type_by_license_type", collections.StringKey, collections.StringValue),
 
@@ -290,7 +294,13 @@ func (k Keeper) requireOwner(ctx context.Context, signer string) error {
 	return nil
 }
 
-// registerOperator adds operator to the operator set.
+// registerOperator adds operator to the operator set. Membership is checked
+// first: a Has is cheaper than rewriting the key, and every activation after an
+// operator's first finds it already registered.
 func (k Keeper) registerOperator(ctx context.Context, operator string) error {
+	has, err := k.Operators.Has(ctx, operator)
+	if err != nil || has {
+		return err
+	}
 	return k.Operators.Set(ctx, operator)
 }

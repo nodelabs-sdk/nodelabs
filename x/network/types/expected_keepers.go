@@ -8,10 +8,12 @@ import (
 
 // LicenseKeeper is the x/license keeper surface the network module consumes.
 type LicenseKeeper interface {
-	// CountActiveLicenses returns the number of active licenses holder holds
-	// across the given license types. When stopAt is non-zero the walk stops
-	// as soon as the count reaches it, so gas is bounded by the check being
-	// made rather than by holdings; stopAt zero counts everything.
+	// CountActiveLicenses returns the exact number of active licenses holder
+	// holds across the given license types. Activation limits call it on every
+	// MsgActivateNode, so an implementation must cost the same whatever the
+	// holder's holdings (x/license reads a denormalized count). stopAt is a
+	// legacy early-exit bound; callers pass 0 and implementations may ignore
+	// it.
 	CountActiveLicenses(ctx context.Context, holder string, licenseTypes []string, stopAt uint64) (uint64, error)
 
 	// HasLicenseType reports whether license type id exists. Existence is all

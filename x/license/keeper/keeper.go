@@ -46,6 +46,13 @@ type Keeper struct {
 	// removed on revoke. Revoked licenses remain in Licenses.
 	ActiveLicensesByHolder collections.KeySet[collections.Triple[string, string, uint64]]
 
+	// ActiveLicenseCounts is the denormalized size of each
+	// (holder, license_type_id) prefix of ActiveLicensesByHolder, maintained
+	// alongside every write to that index. CountActiveLicenses reads it so the
+	// network module's activation checks cost the same however many licenses
+	// an operator holds. Zero counts are removed.
+	ActiveLicenseCounts collections.Map[collections.Pair[string, string], uint64]
+
 	// Params holds the module parameters, including the module owner — the
 	// address allowed to grant and revoke access within this module.
 	Params collections.Item[types.Params]
@@ -89,6 +96,7 @@ func NewKeeper(
 
 		LicensesByType:         collections.NewKeySet(sb, types.LicensesByTypePrefix, "licenses_by_type", collections.PairKeyCodec(collections.StringKey, collections.Uint64Key)),
 		ActiveLicensesByHolder: collections.NewKeySet(sb, types.ActiveLicensesByHolderPrefix, "active_licenses_by_holder", collections.TripleKeyCodec(collections.StringKey, collections.StringKey, collections.Uint64Key)),
+		ActiveLicenseCounts:    collections.NewMap(sb, types.ActiveLicenseCountsPrefix, "active_license_counts", collections.PairKeyCodec(collections.StringKey, collections.StringKey), collections.Uint64Value),
 
 		Params: collections.NewItem(sb, types.ParamsPrefix, "params", codec.CollValue[types.Params](cdc)),
 		Grants: accesskeeper.NewGrants(sb, types.GrantsPrefix, "grants", types.ModuleName,
@@ -244,7 +252,7 @@ func (k *Keeper) InitGenesis(ctx context.Context, data *types.GenesisState) erro
 		}
 		// The holder index tracks active licenses only.
 		if license.Status == types.StatusActive {
-			if err := k.ActiveLicensesByHolder.Set(ctx, collections.Join3(license.Holder, license.Type, license.Id)); err != nil {
+			if err := k.AddActiveLicense(ctx, license.Holder, license.Type, license.Id); err != nil {
 				return err
 			}
 		}
@@ -313,30 +321,98 @@ func (k Keeper) createAccountIfNotExists(ctx context.Context, addr sdk.AccAddres
 }
 
 // CountActiveLicenses returns the number of active licenses holder holds
-// across the given license types, via prefix walks over the
-// ActiveLicensesByHolder index. When stopAt is non-zero the walk stops as
-// soon as the count reaches it, so gas is bounded by the check being made
-// rather than by the holder's holdings; stopAt zero counts everything.
+// across the given license types. It reads the denormalized
+// ActiveLicenseCounts, so its cost is one read per license type regardless of
+// holdings.
+//
+// stopAt is ignored and the exact count is always returned. It bounded an
+// index walk before the counts existed, and stays in the signature so the
+// cross-module LicenseKeeper interface is unchanged for consumers.
 //
 // "Active" means "not revoked": the module never enforces EndDate, so an
 // expired-but-unrevoked license still counts. License types meant for
 // counting should be issued with an empty end_date (revocation-only
 // lifecycle).
-func (k Keeper) CountActiveLicenses(ctx context.Context, holder string, licenseTypes []string, stopAt uint64) (uint64, error) {
+func (k Keeper) CountActiveLicenses(ctx context.Context, holder string, licenseTypes []string, _ uint64) (uint64, error) {
 	var count uint64
 	for _, typeID := range licenseTypes {
-		rng := collections.NewSuperPrefixedTripleRange[string, string, uint64](holder, typeID)
-		if err := k.ActiveLicensesByHolder.Walk(ctx, rng, func(_ collections.Triple[string, string, uint64]) (bool, error) {
-			count++
-			return stopAt != 0 && count >= stopAt, nil
-		}); err != nil {
+		n, err := k.getActiveLicenseCount(ctx, holder, typeID)
+		if err != nil {
 			return 0, err
 		}
-		if stopAt != 0 && count >= stopAt {
-			break
-		}
+		count += n
 	}
 	return count, nil
+}
+
+// AddActiveLicense inserts a license into ActiveLicensesByHolder and bumps the
+// holder's denormalized count. Every insert into the index must go through
+// here so the two never diverge.
+func (k Keeper) AddActiveLicense(ctx context.Context, holder, typeID string, id uint64) error {
+	if err := k.ActiveLicensesByHolder.Set(ctx, collections.Join3(holder, typeID, id)); err != nil {
+		return err
+	}
+	n, err := k.getActiveLicenseCount(ctx, holder, typeID)
+	if err != nil {
+		return err
+	}
+	return k.ActiveLicenseCounts.Set(ctx, collections.Join(holder, typeID), n+1)
+}
+
+// removeActiveLicense is the inverse of AddActiveLicense.
+func (k Keeper) removeActiveLicense(ctx context.Context, holder, typeID string, id uint64) error {
+	has, err := k.ActiveLicensesByHolder.Has(ctx, collections.Join3(holder, typeID, id))
+	if err != nil || !has {
+		return err
+	}
+	if err := k.ActiveLicensesByHolder.Remove(ctx, collections.Join3(holder, typeID, id)); err != nil {
+		return err
+	}
+	n, err := k.getActiveLicenseCount(ctx, holder, typeID)
+	if err != nil {
+		return err
+	}
+	if n <= 1 {
+		return k.ActiveLicenseCounts.Remove(ctx, collections.Join(holder, typeID))
+	}
+	return k.ActiveLicenseCounts.Set(ctx, collections.Join(holder, typeID), n-1)
+}
+
+func (k Keeper) getActiveLicenseCount(ctx context.Context, holder, typeID string) (uint64, error) {
+	n, err := k.ActiveLicenseCounts.Get(ctx, collections.Join(holder, typeID))
+	if errors.Is(err, collections.ErrNotFound) {
+		return 0, nil
+	}
+	return n, err
+}
+
+// RebuildActiveLicenseCounts recomputes ActiveLicenseCounts from the
+// ActiveLicensesByHolder index, discarding whatever was stored. Used by the
+// store migration that introduced the counts.
+func (k Keeper) RebuildActiveLicenseCounts(ctx context.Context) error {
+	if err := k.ActiveLicenseCounts.Clear(ctx, nil); err != nil {
+		return err
+	}
+	type holderType struct{ holder, typeID string }
+	counts := make(map[holderType]uint64)
+	var order []holderType
+	if err := k.ActiveLicensesByHolder.Walk(ctx, nil, func(key collections.Triple[string, string, uint64]) (bool, error) {
+		ht := holderType{key.K1(), key.K2()}
+		if _, ok := counts[ht]; !ok {
+			order = append(order, ht)
+		}
+		counts[ht]++
+		return false, nil
+	}); err != nil {
+		return err
+	}
+	// order follows the index's key order, so writes are deterministic.
+	for _, ht := range order {
+		if err := k.ActiveLicenseCounts.Set(ctx, collections.Join(ht.holder, ht.typeID), counts[ht]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // nextLicenseID returns the id to assign to the next license and advances the

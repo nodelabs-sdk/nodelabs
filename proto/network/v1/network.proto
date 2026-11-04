@@ -49,9 +49,9 @@ message Node {
   // status is the node lifecycle state.
   NodeStatus status = 5;
   // last_active_time is the block time of the node's most recent counted
-  // activity (activation, status update, or attestation). It determines the
-  // node's bucket in the recent-activity index; deactivation does not touch
-  // it.
+  // activity (activation, status update, or attestation). Its UTC day
+  // determines whether the node counts in its recent-activity window as today
+  // or yesterday; deactivation does not touch it.
   google.protobuf.Timestamp last_active_time = 6 [
     (gogoproto.stdtime) = true,
     (gogoproto.nullable) = false,
@@ -111,6 +111,21 @@ message OperatorNodeCounts {
   uint64 total = 1;
   // active is the number of currently active nodes.
   uint64 active = 2;
+}
+
+// RecentNodeWindow is the denormalized two-day recent-activity tally for one
+// (operator, node type): how many of its nodes had their most recent counted
+// activity on UTC day `epoch` (today) and on day `epoch - 1` (yesterday).
+// Every node is counted in at most one of the two, by the day of its
+// last_active_time. A stored window is rolled forward to the current day
+// before it is read or written.
+message RecentNodeWindow {
+  // epoch is the UTC day (DayEpoch) that `today` refers to.
+  uint64 epoch = 1;
+  // today counts nodes whose last counted activity fell on `epoch`.
+  uint64 today = 2;
+  // yesterday counts nodes whose last counted activity fell on `epoch - 1`.
+  uint64 yesterday = 3;
 }
 
 // Params defines the parameters for the network module. Defaults are

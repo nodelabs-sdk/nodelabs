@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"cosmossdk.io/collections"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 
 // InitGenesis initializes the module's state from a genesis state. The
 // denormalized structures (operator set, operator indexes, node counts, the
-// recent-activity index, and the node-type-by-license index) are derived from
+// recent-activity windows, and the node-type-by-license index) are derived from
 // the primary records here, so they can never disagree with them.
 func (k *Keeper) InitGenesis(ctx context.Context, data *types.GenesisState) error {
 	if err := data.Validate(); err != nil {
@@ -56,6 +57,10 @@ func (k *Keeper) InitGenesis(ctx context.Context, data *types.GenesisState) erro
 	// pointer identity and every Join would allocate a fresh, never-equal key.
 	type tallyKey struct{ operator, nodeType string }
 	counts := make(map[tallyKey]types.OperatorNodeCounts)
+	// Recent-activity windows are relative to a day, and the genesis block
+	// time is the only one available: nodes last active on that day or the
+	// one before are counted, older ones have aged out.
+	recent := newRecentWindows(types.DayEpoch(sdk.UnwrapSDKContext(ctx).BlockTime()))
 	for _, node := range data.Nodes {
 		if err := k.Nodes.Set(ctx, node.Address, node); err != nil {
 			return err
@@ -63,11 +68,7 @@ func (k *Keeper) InitGenesis(ctx context.Context, data *types.GenesisState) erro
 		if err := k.OperatorNodes.Set(ctx, collections.Join(node.Operator, node.Address)); err != nil {
 			return err
 		}
-		// Exactly one recent-activity entry per node, in the day bucket of
-		// its last counted activity.
-		if err := k.RecentNodeActivity.Set(ctx, collections.Join4(node.Operator, node.Type, types.DayEpoch(node.LastActiveTime), node.Address)); err != nil {
-			return err
-		}
+		recent.add(node)
 		if err := k.Operators.Set(ctx, node.Operator); err != nil {
 			return err
 		}
@@ -84,6 +85,9 @@ func (k *Keeper) InitGenesis(ctx context.Context, data *types.GenesisState) erro
 		if err := k.OperatorNodeCounts.Set(ctx, collections.Join(key.operator, key.nodeType), c); err != nil {
 			return err
 		}
+	}
+	if err := recent.write(ctx, *k); err != nil {
+		return err
 	}
 
 	for _, nsc := range data.NodeStatusCounters {

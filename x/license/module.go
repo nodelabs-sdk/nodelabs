@@ -3,6 +3,7 @@ package license
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
@@ -24,7 +25,7 @@ import (
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 
-const ConsensusVersion = 1
+const ConsensusVersion = 2
 
 var (
 	_ module.AppModuleBasic   = AppModuleBasic{}
@@ -112,6 +113,11 @@ func (a AppModule) QuerierRoute() string {
 func (a AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(a.keeper))
 	types.RegisterQueryServer(cfg.QueryServer(), keeper.NewQuerier(a.keeper))
+
+	m := keeper.NewMigrator(a.keeper)
+	if err := cfg.RegisterMigration(types.ModuleName, 1, m.Migrate1to2); err != nil {
+		panic(fmt.Sprintf("failed to register %s migration 1->2: %v", types.ModuleName, err))
+	}
 }
 
 func (a AppModule) ConsensusVersion() uint64 {

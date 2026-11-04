@@ -61,11 +61,22 @@ func (k Keeper) CheckAndConsumeGaslessQuota(ctx context.Context, m sdk.Msg) erro
 		if !found || key.Status != types.KeyActive || key.Operator != msg.Operator {
 			return errorsmod.Wrapf(types.ErrUnauthorized, "activation key %s is not an active key of operator %s", msg.ActivationAddress, msg.Operator)
 		}
-		// The msg names its node type, so the gate is the narrow one.
-		if err := k.EnsureOperatorLicensedForNodeType(ctx, msg.Operator, msg.NodeType); err != nil {
+		// The msg names its node type, so the gate is the narrow one. This
+		// is EnsureOperatorLicensedForNodeType inlined, with the same errors
+		// in the same order, so the license count it reads can also size the
+		// quota below rather than being looked up a second time.
+		nodeType, err := k.NodeTypes.Get(ctx, msg.NodeType)
+		if err != nil {
+			return types.ErrInvalidNodeType.Wrapf("node type %q is not registered", msg.NodeType)
+		}
+		count, err := k.licenseKeeper.CountActiveLicenses(ctx, msg.Operator, []string{nodeType.LicenseTypeId}, 0)
+		if err != nil {
 			return err
 		}
-		return k.consumeActivateQuota(ctx, msg, params, blockTime, height)
+		if count == 0 {
+			return types.ErrNoActiveLicenses.Wrapf("operator %s holds no active %s licenses", msg.Operator, nodeType.LicenseTypeId)
+		}
+		return k.consumeActivateQuota(ctx, msg, params, count, blockTime, height)
 
 	case *types.MsgDeactivateNode:
 		node, active, err := k.IsActiveNode(ctx, msg.NodeAddress)
@@ -122,8 +133,9 @@ func (k Keeper) CheckAndConsumeGaslessQuota(ctx context.Context, m sdk.Msg) erro
 }
 
 // consumeActivateQuota rolls the per-(key, node type) activation counter
-// against the spam ceiling. The license walk stops as soon as the count is
-// decisive for the attempted daily total.
+// against the spam ceiling, spam_limit_multiplier x licenseCount, where
+// licenseCount is the operator's active licenses of the type backing
+// msg.NodeType.
 //
 // The counter is scoped to the node type because its ceiling is: the spam
 // limit is derived from the operator's licenses of the one license type
@@ -131,7 +143,7 @@ func (k Keeper) CheckAndConsumeGaslessQuota(ctx context.Context, m sdk.Msg) erro
 // against whichever type the current msg names, so a key working through a
 // well-licensed type's generous allowance would exhaust the daily quota of a
 // sparsely-licensed one before a single node of it was activated.
-func (k Keeper) consumeActivateQuota(ctx context.Context, msg *types.MsgActivateNode, params types.Params, blockTime time.Time, height int64) error {
+func (k Keeper) consumeActivateQuota(ctx context.Context, msg *types.MsgActivateNode, params types.Params, licenseCount uint64, blockTime time.Time, height int64) error {
 	key := collections.Join3(types.GaslessKindActivate, msg.ActivationAddress, msg.NodeType)
 	counter, err := k.GaslessCounters.Get(ctx, key)
 	if err != nil {
@@ -140,17 +152,8 @@ func (k Keeper) consumeActivateQuota(ctx context.Context, msg *types.MsgActivate
 	counter = rollCounter(counter, blockTime, height)
 	counter.DailyCount++
 
-	stopAt := counter.DailyCount/params.SpamLimitMultiplier + 1
-	nodeType, err := k.NodeTypes.Get(ctx, msg.NodeType)
-	if err != nil {
-		return errorsmod.Wrapf(types.ErrInvalidNodeType, "node type %q is not registered", msg.NodeType)
-	}
-	count, err := k.licenseKeeper.CountActiveLicenses(ctx, msg.Operator, []string{nodeType.LicenseTypeId}, stopAt)
-	if err != nil {
-		return err
-	}
-	if counter.DailyCount > params.SpamLimitMultiplier*count {
-		return errorsmod.Wrapf(types.ErrQuotaExceeded, "activation key %s exceeded %d %s activation attempts today", msg.ActivationAddress, params.SpamLimitMultiplier*count, msg.NodeType)
+	if spamLimit := params.SpamLimitMultiplier * licenseCount; counter.DailyCount > spamLimit {
+		return errorsmod.Wrapf(types.ErrQuotaExceeded, "activation key %s exceeded %d %s activation attempts today", msg.ActivationAddress, spamLimit, msg.NodeType)
 	}
 	return k.GaslessCounters.Set(ctx, key, counter)
 }
