@@ -77,8 +77,10 @@ var (
 // Gasless admission counter kinds, the first key of the GaslessCounters map.
 // NodeStatusCounters is its own store because the plan's state schema names
 // it; the remaining gasless msgs share one keyed map.
+//
+// A chain that ran before MsgAuthorizeActivationKey became a paid msg may still
+// hold counters of kind "authorize". Nothing reads them and they are harmless.
 const (
-	GaslessKindAuthorize  = "authorize"
 	GaslessKindActivate   = "activate"
 	GaslessKindDeactivate = "deactivate"
 )

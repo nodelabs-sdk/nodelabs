@@ -20,9 +20,6 @@ import (
 // re-increment.
 //
 // Per msg:
-//   - MsgAuthorizeActivationKey: operator must hold >= 1 active counted
-//     license (a licenseless address must not have a free tx channel);
-//     counter per operator, limit recent_key_limit per day.
 //   - MsgActivateNode: signing key must exist, be active, and be bound to
 //     the named licensed operator; counter per activation key, limit
 //     spam_limit_multiplier x license count per day (the same ceiling the
@@ -47,12 +44,6 @@ func (k Keeper) CheckAndConsumeGaslessQuota(ctx context.Context, m sdk.Msg) erro
 	}
 
 	switch msg := m.(type) {
-	case *types.MsgAuthorizeActivationKey:
-		if err := k.EnsureOperatorLicensed(ctx, msg.Operator); err != nil {
-			return err
-		}
-		return k.consumeGaslessCounter(ctx, types.GaslessKindAuthorize, msg.Operator, params.RecentKeyLimit, blockTime, height)
-
 	case *types.MsgActivateNode:
 		key, found, err := k.GetActivationKey(ctx, msg.ActivationAddress)
 		if err != nil {

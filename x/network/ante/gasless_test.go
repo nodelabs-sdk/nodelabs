@@ -49,6 +49,7 @@ func TestIsGaslessTx(t *testing.T) {
 		{name: "allowlisted msg, non-zero fee", tx: fakeTx{msgs: []sdk.Msg{gaslessMsg}, fee: fee}, want: false},
 		{name: "non-allowlisted msg, zero fee", tx: fakeTx{msgs: []sdk.Msg{paidMsg}}, want: false},
 		{name: "mixed msgs, zero fee", tx: fakeTx{msgs: []sdk.Msg{gaslessMsg, paidMsg}}, want: false},
+		{name: "authorize activation key, zero fee", tx: fakeTx{msgs: []sdk.Msg{&types.MsgAuthorizeActivationKey{}}}, want: false},
 		{name: "no msgs", tx: fakeTx{}, want: false},
 	}
 	for _, tc := range tests {

@@ -15,7 +15,7 @@ import (
 
 // TestIssueLicensesCreatesHolderAccount pins the integration contract: a
 // wallet holding only a license must have an on-chain account, or it cannot
-// sign its first (gasless) transaction.
+// sign a gasless transaction.
 func TestIssueLicensesCreatesHolderAccount(t *testing.T) {
 	f := keepertest.NewLicenseFixture(t)
 	ms := keeper.NewMsgServerImpl(f.Keeper)

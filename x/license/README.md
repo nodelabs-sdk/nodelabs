@@ -245,9 +245,9 @@ caps are checked with the requested counts aggregated per license type, before
 any license is issued, so a message that would breach a cap issues nothing.
 
 Issuance **creates the holder's account** if it does not exist, so a wallet
-holding only a license can sign its first transaction (e.g. the gasless
-activation-key authorization in [`x/network`](../network/README.md)) without a
-prior funding transfer.
+holding only a license can sign a gasless transaction (e.g. the gasless msgs in
+[`x/network`](../network/README.md)) without a prior funding transfer. Paid
+transactions, including authorizing an activation key, still need funds.
 
 ### MsgRevokeLicenses
 Revoke active licenses for a holder, most recently issued first. Sets status to `revoked` and records the current block date as `revoked_date`; the issued `end_date` is left unchanged. Signer must hold the `revoke` grant.

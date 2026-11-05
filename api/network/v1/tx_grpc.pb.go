@@ -45,7 +45,7 @@ type MsgClient interface {
 	// must exist. Regular gas tx.
 	CreateNodeType(ctx context.Context, in *MsgCreateNodeType, opts ...grpc.CallOption) (*MsgCreateNodeTypeResponse, error)
 	// AuthorizeActivationKey authorizes a new activation key for the signing
-	// operator wallet. Gasless.
+	// operator wallet. Regular gas tx.
 	AuthorizeActivationKey(ctx context.Context, in *MsgAuthorizeActivationKey, opts ...grpc.CallOption) (*MsgAuthorizeActivationKeyResponse, error)
 	// DeauthorizeActivationKey disables an activation key. Regular gas tx; the
 	// handler additionally charges the deauthorize_fee param to the operator.
@@ -198,7 +198,7 @@ type MsgServer interface {
 	// must exist. Regular gas tx.
 	CreateNodeType(context.Context, *MsgCreateNodeType) (*MsgCreateNodeTypeResponse, error)
 	// AuthorizeActivationKey authorizes a new activation key for the signing
-	// operator wallet. Gasless.
+	// operator wallet. Regular gas tx.
 	AuthorizeActivationKey(context.Context, *MsgAuthorizeActivationKey) (*MsgAuthorizeActivationKeyResponse, error)
 	// DeauthorizeActivationKey disables an activation key. Regular gas tx; the
 	// handler additionally charges the deauthorize_fee param to the operator.

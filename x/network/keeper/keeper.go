@@ -205,8 +205,8 @@ func (k Keeper) IsActiveNode(ctx context.Context, nodeAddr string) (types.Node, 
 
 // EnsureOperatorLicensed rejects operators that hold no active license of any
 // license type backing a registered node type. It is the gate for actions that
-// name no node type — authorizing an activation key happens before any node
-// exists, so there is nothing narrower to check.
+// name no node type. This module's own msgs all use the narrower
+// EnsureOperatorLicensedForNodeType; it is exported for consuming chains.
 //
 // The walk stops at the first license type the operator holds, so a licensed
 // operator costs one lookup; only an unlicensed one pays the full sweep, and

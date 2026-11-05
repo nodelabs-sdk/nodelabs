@@ -21,7 +21,7 @@ holds in the [`x/license`](../license/README.md) module, per node type.
 - **Entitlement is per node type.** A node type's activation limits come from
   the operator's active licenses of the license type that node type is bound
   to; licenses of any other type do not count
-- **Four messages are gasless**, admitted at zero fee subject to ante-handler
+- **Three messages are gasless**, admitted at zero fee subject to ante-handler
   standing checks and rolling daily quotas
 - **Access grants** for the administrative messages live in this module: the
   owner is the `owner` parameter, and grants are module-wide. The grant
@@ -248,9 +248,8 @@ type is in hand:
   admission and by the daily `UpdateNodeStatus` roll (using the node record's
   own type)
 - `EnsureOperatorLicensed` — the operator must hold at least one active license
-  of *any* license type backing a registered node type. Used only by
-  `AuthorizeActivationKey`, which happens before any node exists and so has
-  nothing narrower to check
+  of *any* license type backing a registered node type. No msg in this module
+  uses it; it is exported for consuming chains' actions that name no node type
 
 "Active" means "not revoked": `x/license` never enforces `end_date`, so an
 expired-but-unrevoked license still counts. License types meant for counting
@@ -258,8 +257,9 @@ should be issued with an empty `end_date`.
 
 ## Gasless transactions
 
-`MsgAuthorizeActivationKey`, `MsgActivateNode`, `MsgDeactivateNode`, and
-`MsgUpdateNodeStatus` are admitted at zero fee. A tx is gasless only if **every**
+`MsgActivateNode`, `MsgDeactivateNode`, and `MsgUpdateNodeStatus` are admitted
+at zero fee. `MsgAuthorizeActivationKey` is not: it always pays a fee, so the
+operator wallet must be funded first. A tx is gasless only if **every**
 msg in it is allowlisted **and** the declared fee is exactly zero, which
 prevents smuggling paid msgs into free txs and vice versa.
 
@@ -290,7 +290,6 @@ the counters and never re-increment.
 
 | Msg | Standing check | Counter keyed on | Daily limit |
 |---|---|---|---|
-| `MsgAuthorizeActivationKey` | Operator holds ≥ 1 active counted license | Operator | `recent_key_limit` |
 | `MsgActivateNode` | Key is active and bound to the operator; operator licensed for the node type | Activation key **+ node type** | `spam_limit_multiplier` × licenses of that node type's license type |
 | `MsgDeactivateNode` | Signer is the operator, the node's original still-active key, or the node itself; node is active | Signer | `status_daily_limit` |
 | `MsgUpdateNodeStatus` | Node is active; on the first counted tx of each UTC day, the operator must still be licensed for the node's type | Node | `status_daily_limit` |
@@ -370,7 +369,7 @@ nodelabsd tx network create-operator-account nodelabs1wallet... --from admin
 ### MsgAuthorizeActivationKey
 Authorize a new activation key for the signing operator. The address must never
 have been authorized by anyone, and must differ from the operator wallet.
-Creates an account for the activation address. **Gasless.**
+Creates an account for the activation address. Regular gas tx.
 
 ```bash
 nodelabsd tx network authorize-activation-key nodelabs1key... --from operator
@@ -476,7 +475,7 @@ GET /nodelabs/network/node_counts/{operator}
 | `activation_limit_multiplier` | `3` | Scales a node type's active license count into that node type's activation limit |
 | `spam_limit_multiplier` | `9` | Scales it into the recent-activity ceiling that hard-stops activation bursts. Must not be below `activation_limit_multiplier` |
 | `max_activation_keys` | `5` | Maximum *active* activation keys per operator |
-| `recent_key_limit` | `10` | Maximum keys an operator may create within `recent_key_window`; also the daily gasless authorize quota |
+| `recent_key_limit` | `10` | Maximum keys an operator may create within `recent_key_window` |
 | `recent_key_window` | `24h` | Sliding window for `recent_key_limit` |
 | `status_daily_limit` | `10` | Maximum `MsgUpdateNodeStatus` per node per UTC day; also the daily gasless deactivate quota |
 | `deauthorize_fee` | *(empty)* | Charged by the `MsgDeauthorizeActivationKey` handler on top of gas. Empty disables the charge |
