@@ -48,8 +48,8 @@ func TestGenesisRoundTrip(t *testing.T) {
 		ActivationAddress: key, Operator: operator,
 		NodeAddress: sample.AccAddress(), NodeType: f.NodeType,
 	}))
-	require.NoError(t, f.Keeper.CheckAndConsumeGaslessQuota(later, &types.MsgAuthorizeActivationKey{
-		Operator: operator, ActivationAddress: sample.AccAddress(),
+	require.NoError(t, f.Keeper.CheckAndConsumeGaslessQuota(later, &types.MsgDeactivateNode{
+		Signer: operator, NodeAddress: nodeA,
 	}))
 
 	exported := f.Keeper.ExportGenesis(f.Ctx)
@@ -92,10 +92,10 @@ func TestGenesisRoundTrip(t *testing.T) {
 		collections.Join3(types.GaslessKindActivate, key, types.GaslessScopeNone))
 	require.ErrorIs(t, err, collections.ErrNotFound, "activate counters must not be pooled under the empty scope")
 
-	authorizeCounter, err := g.Keeper.GaslessCounters.Get(g.Ctx,
-		collections.Join3(types.GaslessKindAuthorize, operator, types.GaslessScopeNone))
+	deactivateCounter, err := g.Keeper.GaslessCounters.Get(g.Ctx,
+		collections.Join3(types.GaslessKindDeactivate, operator, types.GaslessScopeNone))
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), authorizeCounter.DailyCount)
+	require.Equal(t, uint64(1), deactivateCounter.DailyCount)
 
 	// Node types survive, and the by-license-type mapping is rebuilt rather
 	// than exported — so a missing rebuild would leave the filtered query empty

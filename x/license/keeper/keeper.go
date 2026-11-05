@@ -309,8 +309,8 @@ func (k *Keeper) ExportGenesis(ctx context.Context) *types.GenesisState {
 }
 
 // createAccountIfNotExists creates a BaseAccount for addr if none exists,
-// so license holders can sign transactions (e.g. the gasless activation-key
-// authorization) without a prior funding transfer. Pubkeys are set lazily by
+// so license holders can sign gasless transactions without a prior funding
+// transfer. Pubkeys are set lazily by
 // the stock SetPubKeyDecorator on the account's first signed tx.
 func (k Keeper) createAccountIfNotExists(ctx context.Context, addr sdk.AccAddress) {
 	if k.accountKeeper.HasAccount(ctx, addr) {

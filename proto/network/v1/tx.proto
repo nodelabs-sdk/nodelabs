@@ -11,8 +11,8 @@ import "network/v1/network.proto";
 
 option go_package = "github.com/nodelabs-sdk/nodelabs/x/network/types";
 
-// Msg defines the Msg service. AuthorizeActivationKey, ActivateNode,
-// DeactivateNode, and UpdateNodeStatus are gasless: they are admitted with a
+// Msg defines the Msg service. ActivateNode, DeactivateNode, and
+// UpdateNodeStatus are gasless: they are admitted with a
 // zero fee subject to the module's ante-handler admission checks and daily
 // quotas.
 service Msg {
@@ -39,7 +39,7 @@ service Msg {
   }
 
   // AuthorizeActivationKey authorizes a new activation key for the signing
-  // operator wallet. Gasless.
+  // operator wallet. Regular gas tx.
   rpc AuthorizeActivationKey(MsgAuthorizeActivationKey) returns (MsgAuthorizeActivationKeyResponse) {
     option (google.api.http) = {
       post: "/nodelabs/network/tx/authorize_activation_key"

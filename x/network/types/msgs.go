@@ -23,9 +23,11 @@ var (
 // GaslessMessages returns the msg type URLs this module admits with a zero
 // fee, for composing an app's gasless allowlist. Consuming chains append
 // their own module's gasless msgs (e.g. attestation msgs).
+//
+// MsgAuthorizeActivationKey is deliberately absent: authorizing a key always
+// pays a fee.
 func GaslessMessages() []string {
 	return []string{
-		sdk.MsgTypeURL(&MsgAuthorizeActivationKey{}),
 		sdk.MsgTypeURL(&MsgActivateNode{}),
 		sdk.MsgTypeURL(&MsgDeactivateNode{}),
 		sdk.MsgTypeURL(&MsgUpdateNodeStatus{}),

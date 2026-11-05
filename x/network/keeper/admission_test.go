@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"cosmossdk.io/collections"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
@@ -11,58 +13,37 @@ import (
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 
-// TestAdmissionAuthorize: standing requires a licensed operator; the daily
-// counter burns per attempt and resets across UTC days.
-func TestAdmissionAuthorize(t *testing.T) {
+// TestAdmissionRejectsAuthorize: authorizing an activation key is a paid msg,
+// so it is off the allowlist and has no admission route. A licensed operator
+// gets no free path to it, and no counter is burned on the attempt.
+func TestAdmissionRejectsAuthorize(t *testing.T) {
 	f, _ := setup(t)
 	operator := sample.AccAddress()
+	f.IssueLicenses(t, operator, 1)
 	msg := &types.MsgAuthorizeActivationKey{Operator: operator, ActivationAddress: sample.AccAddress()}
 
-	// A licenseless address has no free tx channel.
-	require.ErrorIs(t, f.Keeper.CheckAndConsumeGaslessQuota(f.Ctx, msg), types.ErrNoActiveLicenses)
+	require.NotContains(t, types.GaslessMessages(), sdk.MsgTypeURL(msg))
+	require.ErrorIs(t, f.Keeper.CheckAndConsumeGaslessQuota(f.Ctx, msg), types.ErrUnauthorized)
 
-	f.IssueLicenses(t, operator, 1)
-
-	params, err := f.Keeper.GetParams(f.Ctx)
+	has, err := f.Keeper.GaslessCounters.Has(f.Ctx, collections.Join3("authorize", operator, types.GaslessScopeNone))
 	require.NoError(t, err)
-
-	// Every attempt burns quota — including ones whose handler would fail.
-	for i := uint64(0); i < params.RecentKeyLimit; i++ {
-		require.NoError(t, f.Keeper.CheckAndConsumeGaslessQuota(f.Ctx, msg))
-	}
-	require.ErrorIs(t, f.Keeper.CheckAndConsumeGaslessQuota(f.Ctx, msg), types.ErrQuotaExceeded)
-
-	// The counter resets on the next UTC day.
-	nextDay := f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(24 * time.Hour))
-	require.NoError(t, f.Keeper.CheckAndConsumeGaslessQuota(nextDay, msg))
+	require.False(t, has)
 }
 
-// TestAdmissionAuthorizeAnyBoundLicenseType: authorizing an activation key
-// names no node type — no node exists yet — so its gate is "holds a license of
-// any license type backing a registered node type". Licenses of a type nothing
-// is bound to do not count.
-func TestAdmissionAuthorizeAnyBoundLicenseType(t *testing.T) {
-	f, ms := setup(t)
+// TestEnsureOperatorLicensedAnyBoundLicenseType: the gate for actions that name
+// no node type is "holds a license of any license type backing a registered
+// node type". Licenses of a type nothing is bound to do not count.
+func TestEnsureOperatorLicensedAnyBoundLicenseType(t *testing.T) {
+	f, _ := setup(t)
 	operator := sample.AccAddress()
-
-	authorize := func() error {
-		return f.Keeper.CheckAndConsumeGaslessQuota(f.Ctx, &types.MsgAuthorizeActivationKey{
-			Operator: operator, ActivationAddress: sample.AccAddress(),
-		})
-	}
 
 	// Licences of a type no node type is bound to buy nothing.
 	f.IssueLicensesOfType(t, operator, "nodelabs.node.unbound", 5)
-	require.ErrorIs(t, authorize(), types.ErrNoActiveLicenses)
+	require.ErrorIs(t, f.Keeper.EnsureOperatorLicensed(f.Ctx, operator), types.ErrNoActiveLicenses)
 
-	// A licence of any bound type admits. Nano is enough even though the
-	// operator holds no trust licences: authorizing a key names no node type,
-	// so the gate cannot be narrower than "some bound type".
+	// A licence of any bound type is enough, even with no trust licences.
 	f.IssueLicensesOfType(t, operator, f.NanoLicenseType, 1)
-	require.NoError(t, authorize())
-
-	// And the msg path agrees with the ante path.
-	_ = authorizeKey(t, f, ms, f.Ctx, operator)
+	require.NoError(t, f.Keeper.EnsureOperatorLicensed(f.Ctx, operator))
 }
 
 // TestAdmissionActivate: standing requires an active key bound to the named
