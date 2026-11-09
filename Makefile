@@ -4,6 +4,11 @@ BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 COMMIT := $(shell git log -1 --format='%H' 2>/dev/null || echo "unknown")
 BUILDDIR ?= $(CURDIR)/build
 
+# Every Go module in the repository, dependencies first. The go tool stops at
+# module boundaries, so ./... from the root covers only app and cmd; anything
+# meant to cover the whole repository loops over this list.
+MODULES := api access x/license x/license/precompile x/network .
+
 # Build tags
 build_tags = netgo
 build_tags += $(BUILD_TAGS)
@@ -36,21 +41,31 @@ go.sum: go.mod
 	@go mod verify
 	@go mod tidy
 
+tidy:
+	@for m in $(MODULES); do \
+		echo "--> Tidying $$m"; \
+		(cd $$m && go mod tidy) || exit 1; \
+	done
+
 ###############################################################################
 ###                                Testing                                  ###
 ###############################################################################
 
 test:
-	@echo "--> Running tests"
-	@go test -race ./...
+	@for m in $(MODULES); do \
+		echo "--> Running tests in $$m"; \
+		(cd $$m && go test -race ./...) || exit 1; \
+	done
 
 ###############################################################################
 ###                                Linting                                  ###
 ###############################################################################
 
 lint:
-	@echo "--> Running linter"
-	@golangci-lint run --timeout=10m
+	@for m in $(MODULES); do \
+		echo "--> Running linter in $$m"; \
+		(cd $$m && golangci-lint run --timeout=10m) || exit 1; \
+	done
 
 ###############################################################################
 ###                                Protobuf                                 ###
@@ -69,7 +84,7 @@ proto-all: proto-format proto-lint proto-gen format
 proto-gen:
 	@echo "Generating Protobuf files"
 	@$(protoImage) sh ./scripts/protocgen.sh
-	@go mod tidy
+	@$(MAKE) tidy
 
 proto-format:
 	@echo "Formatting Protobuf files"
@@ -86,4 +101,4 @@ proto-lint:
 sh-testnet: install
 	@./scripts/testnet.sh -y
 
-.PHONY: all build install test lint proto-all proto-gen proto-format proto-lint sh-testnet
+.PHONY: all build install tidy test lint proto-all proto-gen proto-format proto-lint sh-testnet

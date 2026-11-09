@@ -8,7 +8,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 // ValidateDates validates start_date and end_date strings in YYYY-MM-DD form.

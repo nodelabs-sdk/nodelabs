@@ -8,10 +8,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
 	"github.com/nodelabs-sdk/nodelabs/x/license/keeper"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/license/testutil/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/license/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 

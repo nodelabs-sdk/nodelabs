@@ -31,7 +31,12 @@ rm -rf github.com
 # LICENSE file on case-insensitive filesystems. Staging also means the set of
 # namespaces never has to be derived — proto packages that are shared
 # libraries rather than modules have no module/v1/module.proto to key off.
-rm -rf api && mv .protogen api
+#
+# api/ is its own Go module, so only the generated namespaces are replaced:
+# api/go.mod and api/go.sum must survive a regeneration.
+find api -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+cp -r .protogen/* api/
+rm -rf .protogen
 
 # Fix incorrect SDK type references for pulsar generated files
 find api -type f -name '*.go' -exec sed -i'' -e 's|types "github.com/cosmos/cosmos-sdk/types"|types "cosmossdk.io/api/cosmos/base/v1beta1"|g' {} \;

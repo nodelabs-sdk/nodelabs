@@ -11,9 +11,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/gogoproto/proto"
 
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
 	licensev1 "github.com/nodelabs-sdk/nodelabs/api/license/v1"
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	"github.com/nodelabs-sdk/nodelabs/x/license/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 

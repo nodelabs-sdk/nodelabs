@@ -19,48 +19,16 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
 	licensekeeper "github.com/nodelabs-sdk/nodelabs/x/license/keeper"
+	licensetest "github.com/nodelabs-sdk/nodelabs/x/license/testutil/keeper"
 	licensetypes "github.com/nodelabs-sdk/nodelabs/x/license/types"
 	networkkeeper "github.com/nodelabs-sdk/nodelabs/x/network/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/network/testutil/sample"
 	networktypes "github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
-
-// FakeAccountKeeper is a map-backed types.AccountKeeper for keeper tests.
-type FakeAccountKeeper struct {
-	accounts map[string]sdk.AccountI
-	nextNum  uint64
-}
-
-func NewFakeAccountKeeper() *FakeAccountKeeper {
-	return &FakeAccountKeeper{accounts: make(map[string]sdk.AccountI)}
-}
-
-func (f *FakeAccountKeeper) GetAccount(_ context.Context, addr sdk.AccAddress) sdk.AccountI {
-	return f.accounts[addr.String()]
-}
-
-func (f *FakeAccountKeeper) HasAccount(_ context.Context, addr sdk.AccAddress) bool {
-	_, ok := f.accounts[addr.String()]
-	return ok
-}
-
-func (f *FakeAccountKeeper) NewAccountWithAddress(_ context.Context, addr sdk.AccAddress) sdk.AccountI {
-	acc := authtypes.NewBaseAccountWithAddress(addr)
-	if err := acc.SetAccountNumber(f.nextNum); err != nil {
-		panic(err)
-	}
-	f.nextNum++
-	return acc
-}
-
-func (f *FakeAccountKeeper) SetAccount(_ context.Context, acc sdk.AccountI) {
-	f.accounts[acc.GetAddress().String()] = acc
-}
 
 // FakeBankKeeper records module transfers for keeper tests.
 type FakeBankKeeper struct {
@@ -96,7 +64,7 @@ func (f *FakeBankKeeper) SendCoinsFromAccountToModule(_ context.Context, senderA
 type NetworkFixture struct {
 	Keeper        networkkeeper.Keeper
 	LicenseKeeper licensekeeper.Keeper
-	AccountKeeper *FakeAccountKeeper
+	AccountKeeper *licensetest.FakeAccountKeeper
 	BankKeeper    *FakeBankKeeper
 	Ctx           sdk.Context
 	Authority     string
@@ -144,7 +112,7 @@ func NewNetworkFixture(t testing.TB) *NetworkFixture {
 	owner := sample.AccAddress()
 	authority := sample.AccAddress()
 
-	ak := NewFakeAccountKeeper()
+	ak := licensetest.NewFakeAccountKeeper()
 	bk := &FakeBankKeeper{}
 
 	lk := licensekeeper.NewKeeper(
@@ -263,7 +231,7 @@ func (f *NetworkFixture) IssueLicenses(t testing.TB, holder string, count uint64
 // IssueLicensesOfType is IssueLicenses for an arbitrary license type id.
 func (f *NetworkFixture) IssueLicensesOfType(t testing.TB, holder, typeID string, count uint64) {
 	t.Helper()
-	SeedActiveLicenses(t, f.LicenseKeeper, f.Ctx, holder, typeID, count)
+	licensetest.SeedActiveLicenses(t, f.LicenseKeeper, f.Ctx, holder, typeID, count)
 }
 
 // RevokeLicenses revokes count of holder's active licenses of the fixture's

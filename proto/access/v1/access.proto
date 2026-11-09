@@ -3,7 +3,7 @@ package access.v1;
 
 import "cosmos_proto/cosmos.proto";
 
-option go_package = "github.com/nodelabs-sdk/nodelabs/x/access/types";
+option go_package = "github.com/nodelabs-sdk/nodelabs/access/types";
 
 // Grant is a single (grantee, action, scope) entry — the flat form stored in
 // state and served by queries and genesis. The action vocabulary is static

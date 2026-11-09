@@ -8,7 +8,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/nodelabs-sdk/nodelabs/x/access/types"
+	"github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 // GrantKey is the flat state key of a grant: (grantee, action, scope). The

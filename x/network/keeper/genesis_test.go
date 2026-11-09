@@ -7,9 +7,9 @@ import (
 	"cosmossdk.io/collections"
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/network/testutil/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/network/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 

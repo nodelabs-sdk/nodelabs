@@ -18,9 +18,9 @@ import (
 
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	"github.com/nodelabs-sdk/nodelabs/x/access/keeper"
-	"github.com/nodelabs-sdk/nodelabs/x/access/types"
+	"github.com/nodelabs-sdk/nodelabs/access/keeper"
+	"github.com/nodelabs-sdk/nodelabs/access/testutil/sample"
+	"github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 const (

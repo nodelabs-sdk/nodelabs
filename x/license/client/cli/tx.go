@@ -11,7 +11,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/spf13/cobra"
 
-	accesscli "github.com/nodelabs-sdk/nodelabs/x/access/client/cli"
+	accesscli "github.com/nodelabs-sdk/nodelabs/access/client/cli"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 

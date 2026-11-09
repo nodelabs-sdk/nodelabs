@@ -8,8 +8,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	"github.com/nodelabs-sdk/nodelabs/x/access/types"
+	"github.com/nodelabs-sdk/nodelabs/access/testutil/sample"
+	"github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 // TestUppercaseBech32IsTheSameAccount pins the property the guard exists for.

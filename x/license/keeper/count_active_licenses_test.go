@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/license/keeper"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/license/testutil/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/license/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 

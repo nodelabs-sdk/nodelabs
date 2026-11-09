@@ -7,7 +7,7 @@ import (
 	fmt "fmt"
 	_ "github.com/cosmos/gogoproto/gogoproto"
 	proto "github.com/cosmos/gogoproto/proto"
-	types "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	types "github.com/nodelabs-sdk/nodelabs/access/types"
 	io "io"
 	math "math"
 	math_bits "math/bits"

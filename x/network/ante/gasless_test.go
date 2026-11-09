@@ -10,8 +10,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
 	networkante "github.com/nodelabs-sdk/nodelabs/x/network/ante"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/network/testutil/keeper"
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 

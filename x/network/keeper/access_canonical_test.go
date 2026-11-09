@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
+	"github.com/nodelabs-sdk/nodelabs/x/network/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 

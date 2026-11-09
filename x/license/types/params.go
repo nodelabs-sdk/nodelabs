@@ -1,7 +1,7 @@
 package types
 
 import (
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 // DefaultParams returns the module's default parameters. The owner is empty:

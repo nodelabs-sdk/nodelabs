@@ -9,10 +9,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
 	"github.com/nodelabs-sdk/nodelabs/x/network/keeper"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/network/testutil/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/network/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 
