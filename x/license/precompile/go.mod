@@ -9,7 +9,7 @@ require (
 	cosmossdk.io/math v1.5.3
 	cosmossdk.io/store v1.1.2
 	github.com/cosmos/cosmos-sdk v0.53.8
-	github.com/cosmos/evm v0.6.3
+	github.com/cosmos/evm v0.6.4
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/holiman/uint256 v1.3.2
 	github.com/nodelabs-sdk/nodelabs/x/license v0.0.0
