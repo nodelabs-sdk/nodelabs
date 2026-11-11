@@ -235,7 +235,8 @@ func (ms msgServer) DeactivateNode(ctx context.Context, msg *types.MsgDeactivate
 // UpdateNodeStatus records a node's status heartbeat. The daily quota is
 // consumed in the ante handler (so failing txs still burn it and over-limit
 // spam is rejected at mempool admission); the handler re-reads the counter
-// and never increments it. The payload is emitted as an event, not stored.
+// and never increments it. The payload is emitted as an event, not stored;
+// only the time of the update is kept, as the node's last_status_time.
 func (ms msgServer) UpdateNodeStatus(ctx context.Context, msg *types.MsgUpdateNodeStatus) (*types.MsgUpdateNodeStatusResponse, error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 
@@ -259,7 +260,11 @@ func (ms msgServer) UpdateNodeStatus(ctx context.Context, msg *types.MsgUpdateNo
 		return nil, errorsmod.Wrapf(types.ErrQuotaExceeded, "node %s exceeded %d status updates today", msg.NodeAddress, params.StatusDailyLimit)
 	}
 
-	if err := ms.k.TouchNodeActivity(ctx, msg.NodeAddress); err != nil {
+	if err := ms.k.touchNode(ctx, &node); err != nil {
+		return nil, err
+	}
+	node.LastStatusTime = sdkCtx.BlockTime()
+	if err := ms.k.Nodes.Set(ctx, node.Address, node); err != nil {
 		return nil, err
 	}
 

@@ -377,8 +377,15 @@ func TestUpdateNodeStatus(t *testing.T) {
 	key := authorizeKey(t, f, ms, f.Ctx, operator)
 	node := activateNode(t, f, ms, f.Ctx, key, operator)
 
+	// Activation and other counted activity (attestations go through
+	// TouchNodeActivity) leave last_status_time unset.
+	require.NoError(t, f.Keeper.TouchNodeActivity(f.WithBlockTime(keepertest.NetworkFixtureBlockTime.Add(time.Hour)), node))
+	rec, err := f.Keeper.Nodes.Get(f.Ctx, node)
+	require.NoError(t, err)
+	require.True(t, rec.LastStatusTime.IsZero())
+
 	// Unknown node.
-	_, err := ms.UpdateNodeStatus(f.Ctx, &types.MsgUpdateNodeStatus{
+	_, err = ms.UpdateNodeStatus(f.Ctx, &types.MsgUpdateNodeStatus{
 		NodeAddress: sample.AccAddress(),
 	})
 	require.ErrorIs(t, err, types.ErrNodeNotFound)
@@ -394,9 +401,10 @@ func TestUpdateNodeStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	rec, err := f.Keeper.Nodes.Get(f.Ctx, node)
+	rec, err = f.Keeper.Nodes.Get(f.Ctx, node)
 	require.NoError(t, err)
 	require.Equal(t, later.BlockTime().Unix(), rec.LastActiveTime.Unix())
+	require.Equal(t, later.BlockTime().Unix(), rec.LastStatusTime.Unix())
 
 	found := false
 	for _, ev := range later.EventManager().Events() {

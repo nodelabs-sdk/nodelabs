@@ -19,14 +19,25 @@ import (
 // last_active_time, so each node is counted at most once. Callers are
 // responsible for checking the node is active.
 //
-// This is the only path that may advance a node's last_active_time: the window
-// is maintained here, so writing the field elsewhere would desynchronize it.
+// This (via touchNode) is the only path that may advance a node's
+// last_active_time: the window is maintained here, so writing the field
+// elsewhere would desynchronize it.
 func (k Keeper) TouchNodeActivity(ctx context.Context, nodeAddr string) error {
 	node, err := k.Nodes.Get(ctx, nodeAddr)
 	if err != nil {
 		return types.ErrNodeNotFound.Wrapf("node %s", nodeAddr)
 	}
 
+	if err := k.touchNode(ctx, &node); err != nil {
+		return err
+	}
+	return k.Nodes.Set(ctx, nodeAddr, node)
+}
+
+// touchNode applies TouchNodeActivity to an already-loaded record without
+// persisting it, so a caller that also changes other fields of the node writes
+// it once. The caller must Set the node afterwards.
+func (k Keeper) touchNode(ctx context.Context, node *types.Node) error {
 	blockTime := sdk.UnwrapSDKContext(ctx).BlockTime()
 	oldEpoch := types.DayEpoch(node.LastActiveTime)
 	newEpoch := types.DayEpoch(blockTime)
@@ -38,7 +49,7 @@ func (k Keeper) TouchNodeActivity(ctx context.Context, nodeAddr string) error {
 	}
 
 	node.LastActiveTime = blockTime
-	return k.Nodes.Set(ctx, nodeAddr, node)
+	return nil
 }
 
 // rollWindow advances w so that its today slot refers to day. Advancing by one

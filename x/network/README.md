@@ -171,6 +171,7 @@ create within `recent_key_window` (disabled keys included).
 | `type` | The node type id; must name a registered node type |
 | `status` | `active` or `deactivated` |
 | `last_active_time` | Block time of the most recent counted activity |
+| `last_status_time` | Block time of the most recent accepted status update; zero if the node has never reported status |
 
 Node addresses are single-use. Records are never removed, so a deactivated
 node's record is exactly what prevents its address from being re-activated.
