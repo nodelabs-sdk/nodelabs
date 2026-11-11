@@ -57,6 +57,15 @@ message Node {
     (gogoproto.nullable) = false,
     (amino.dont_omitempty) = true
   ];
+  // last_status_time is the block time of the node's most recent accepted
+  // status update (MsgUpdateNodeStatus). Unlike last_active_time it is not
+  // stamped by activation or attestations; the zero time means the node has
+  // never reported status.
+  google.protobuf.Timestamp last_status_time = 7 [
+    (gogoproto.stdtime) = true,
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
 }
 
 // NodeType is a registered node type. Registration binds the node type to an
