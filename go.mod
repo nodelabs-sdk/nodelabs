@@ -24,9 +24,9 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
-	github.com/nodelabs-sdk/nodelabs/x/license v0.4.0-alpha.1
-	github.com/nodelabs-sdk/nodelabs/x/license/precompile v0.4.0-alpha.1
-	github.com/nodelabs-sdk/nodelabs/x/network v0.4.0-alpha.1
+	github.com/nodelabs-sdk/nodelabs/x/license v0.4.0-alpha.2
+	github.com/nodelabs-sdk/nodelabs/x/license/precompile v0.4.0-alpha.2
+	github.com/nodelabs-sdk/nodelabs/x/network v0.4.0-alpha.2
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
@@ -186,8 +186,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nodelabs-sdk/nodelabs/access v0.4.0-alpha.1 // indirect
-	github.com/nodelabs-sdk/nodelabs/api v0.4.0-alpha.1 // indirect
+	github.com/nodelabs-sdk/nodelabs/access v0.4.0-alpha.2 // indirect
+	github.com/nodelabs-sdk/nodelabs/api v0.4.0-alpha.2 // indirect
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
