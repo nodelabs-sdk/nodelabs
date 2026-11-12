@@ -6,9 +6,9 @@ import (
 	"cosmossdk.io/math"
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
 	licensetypes "github.com/nodelabs-sdk/nodelabs/x/license/types"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/network/testutil/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/network/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 

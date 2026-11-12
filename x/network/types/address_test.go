@@ -8,7 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
+	"github.com/nodelabs-sdk/nodelabs/x/network/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/network/types"
 )
 

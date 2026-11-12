@@ -6,7 +6,7 @@ The `x/license` module provides on-chain license management for Cosmos SDK chain
 
 - **License Types** define templates (e.g. `node.license`, `validator.license`) with optional max supply and a declarative transferrability flag
 - **Licenses** are individual instances issued to holders with start/end dates and active/revoked status
-- **Ownership and access grants** live in this module: the owner is the `owner` parameter, and per-type `issue`/`revoke` grants plus a module-wide `type.create` grant are stored alongside the licenses themselves. The owner grants these rights rather than holding them implicitly. The grant machinery is the shared [`x/access`](../access) library
+- **Ownership and access grants** live in this module: the owner is the `owner` parameter, and per-type `issue`/`revoke` grants plus a module-wide `type.create` grant are stored alongside the licenses themselves. The owner grants these rights rather than holding them implicitly. The grant machinery is the shared [`access`](../../access) library
 - **An EVM precompile** exposes the same transactions and queries to Solidity contracts, routed through the same handlers
 - **Downstream consumers** read licenses through a narrow keeper surface — [`x/network`](../network/README.md) derives its per-node-type activation limits from a holder's active license count
 

@@ -25,7 +25,7 @@ holds in the [`x/license`](../license/README.md) module, per node type.
   standing checks and rolling daily quotas
 - **Access grants** for the administrative messages live in this module: the
   owner is the `owner` parameter, and grants are module-wide. The grant
-  machinery is the shared [`x/access`](../access) library
+  machinery is the shared [`access`](../../access) library
 
 ## Installation
 

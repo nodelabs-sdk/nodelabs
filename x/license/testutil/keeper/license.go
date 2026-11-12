@@ -21,8 +21,8 @@ import (
 
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
-	"github.com/nodelabs-sdk/nodelabs/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/license/keeper"
+	"github.com/nodelabs-sdk/nodelabs/x/license/testutil/sample"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 

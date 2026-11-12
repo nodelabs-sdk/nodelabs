@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	accesstypes "github.com/nodelabs-sdk/nodelabs/x/access/types"
+	accesstypes "github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 func DefaultGenesis() *GenesisState {

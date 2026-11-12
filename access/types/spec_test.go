@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodelabs-sdk/nodelabs/x/access/types"
+	"github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 func alwaysExists(_ context.Context, _ string) (bool, error) { return true, nil }

@@ -19,8 +19,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	evmaddress "github.com/cosmos/evm/encoding/address"
 
-	keepertest "github.com/nodelabs-sdk/nodelabs/testutil/keeper"
 	"github.com/nodelabs-sdk/nodelabs/x/license/keeper"
+	keepertest "github.com/nodelabs-sdk/nodelabs/x/license/testutil/keeper"
 	licensetypes "github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 

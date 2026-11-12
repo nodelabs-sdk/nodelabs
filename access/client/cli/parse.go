@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nodelabs-sdk/nodelabs/x/access/types"
+	"github.com/nodelabs-sdk/nodelabs/access/types"
 )
 
 // ModuleWideScopes is the scopes argument requesting a module-wide grant: an

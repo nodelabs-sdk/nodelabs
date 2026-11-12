@@ -13,7 +13,7 @@ import (
 	storetypes "cosmossdk.io/core/store"
 	"cosmossdk.io/log"
 
-	accesskeeper "github.com/nodelabs-sdk/nodelabs/x/access/keeper"
+	accesskeeper "github.com/nodelabs-sdk/nodelabs/access/keeper"
 	"github.com/nodelabs-sdk/nodelabs/x/license/types"
 )
 
